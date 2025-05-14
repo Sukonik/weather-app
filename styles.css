@@ -62,19 +62,101 @@ body {
 
 .app-logo {
     display: flex;
-    justify-content: center;
-    margin-bottom: 2rem;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 3rem;
+    padding: 1rem;
 }
 
-.logo-image {
-    width: 200px;
-    height: 200px;
-    object-fit: contain;
-    transition: transform 0.3s ease;
+.logo-icon {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 1rem;
 }
 
-.logo-image:hover {
-    transform: scale(1.05);
+.sun-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    background-color: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.3);
+}
+
+.sun-rays {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+}
+
+.sun-rays::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        var(--accent) 20deg,
+        transparent 40deg,
+        transparent 70deg,
+        var(--accent) 90deg,
+        transparent 110deg,
+        transparent 140deg,
+        var(--accent) 160deg,
+        transparent 180deg,
+        transparent 210deg,
+        var(--accent) 230deg,
+        transparent 250deg,
+        transparent 280deg,
+        var(--accent) 300deg,
+        transparent 320deg,
+        transparent 350deg,
+        var(--accent) 360deg
+    );
+    border-radius: 50%;
+    animation: rotate 10s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+.logo-text {
+    text-align: center;
+}
+
+.logo-text h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    background: linear-gradient(120deg, var(--accent), #fff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+}
+
+.logo-text span {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
 }
 
 header {
