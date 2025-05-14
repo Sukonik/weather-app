@@ -1,44 +1,49 @@
 import { getWeatherData, getCoordinates, getCurrentLocation } from './js/modules/weatherAPI.js';
-import { convertTemperature, getWeatherDescription, getWeatherIcon, getUVIndexDescription, getAirQualityDescription, getVisibilityDescription } from './js/modules/utils.js';
+import { 
+    convertTemperature, 
+    getWeatherDescription, 
+    getWeatherIcon, 
+    getUVIndexDescription, 
+    getAirQualityDescription, 
+    getAirQualityImplication, 
+    getAirQualityColor, 
+    getVisibilityDescription,
+    getWindDirection,
+    formatSpeed,
+    getPrecipitationIntensity
+} from './js/modules/utils.js';
 import { updateHourlyVisualizations } from './js/modules/visualization.js';
 
 // DOM Elements
-const locationSearch = document.getElementById('location-search');
-const searchBtn = document.getElementById('search-btn');
-const currentLocationBtn = document.getElementById('current-location-btn');
-const locationElement = document.querySelector('.location');
-const temperatureElement = document.querySelector('.temperature');
-const conditionElement = document.querySelector('.condition');
-const feelsLikeElement = document.querySelector('.feels-like');
-const windElement = document.getElementById('wind');
-const humidityElement = document.getElementById('humidity');
-const precipitationElement = document.getElementById('precipitation');
-const uvIndexElement = document.getElementById('uv-index');
-const hourlyContainer = document.getElementById('hourly-container');
-const searchSuggestions = document.getElementById('search-suggestions');
-const currentTimeElement = document.querySelector('.current-time');
-const currentDateElement = document.querySelector('.current-date');
-const unitToggleBtns = document.querySelectorAll('.unit-btn');
-const themeBtn = document.getElementById('theme-btn');
-const themeDropdown = document.querySelector('.theme-dropdown');
-const themeOptions = document.querySelectorAll('.theme-option');
-const speedUnitBtns = document.querySelectorAll('.speed-unit-btn');
-const aqiInfoBtn = document.getElementById('aqi-info-btn');
-const aqiInfoModal = document.getElementById('aqi-info-modal');
-const modalCloseBtn = aqiInfoModal.querySelector('.close-btn');
-const precipCanvas = document.getElementById('precipitation-canvas');
-const windCanvas = document.getElementById('wind-canvas');
+const searchForm = document.getElementById('search-form');
+const searchInput = document.getElementById('search-input');
+const currentLocationBtn = document.getElementById('current-location');
+const errorElement = document.getElementById('error');
+const loadingElement = document.getElementById('loading');
+const locationElement = document.getElementById('location');
+const temperatureElement = document.getElementById('temperature');
+const descriptionElement = document.getElementById('description');
+const weatherIconElement = document.getElementById('weather-icon');
+
+// Canvas elements
+const precipCanvas = document.getElementById('precipCanvas');
+const windCanvas = document.getElementById('windCanvas');
+const tempCanvas = document.getElementById('tempCanvas');
+
+// Time controls
 const timeDisplay = document.getElementById('time-display');
 const prevHourBtn = document.getElementById('prev-hour');
 const nextHourBtn = document.getElementById('next-hour');
 
-// State
-let currentUnit = localStorage.getItem('unit') || 'C';
+// Info cards
+const infoCards = document.querySelectorAll('.info-card');
+
 let currentWeatherData = null;
-let searchTimeout = null;
-let currentTheme = localStorage.getItem('theme') || 'dark';
-let currentSpeedUnit = localStorage.getItem('speedUnit') || 'km/h';
 let currentHourIndex = 0;
+let currentUnit = localStorage.getItem('unit') || 'C';
+let currentSpeedUnit = localStorage.getItem('speedUnit') || 'km/h';
+let currentTheme = localStorage.getItem('theme') || 'dark';
+let searchTimeout = null;
 let animationFrame;
 let particles = [];
 
@@ -48,18 +53,19 @@ updateUnitDisplay();
 updateSpeedUnitDisplay();
 
 // Event Listeners
-searchBtn.addEventListener('click', () => {
-    handleSearch().catch(handleError);
-});
+searchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const location = searchInput.value.trim();
+    if (!location) return;
 
-locationSearch.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleSearch().catch(handleError);
+    try {
+        errorElement.textContent = '';
+        const coordinates = await getCoordinates(location);
+        await updateWeather(coordinates.latitude, coordinates.longitude, coordinates.name);
+    } catch (error) {
+        console.error('Search error:', error);
+        errorElement.textContent = error.message;
     }
-});
-
-locationSearch.addEventListener('input', (e) => {
-    handleSearchInput(e).catch(handleError);
 });
 
 currentLocationBtn.addEventListener('click', () => {
@@ -301,7 +307,7 @@ function updateWeatherDisplays(data) {
     precipitationElement.textContent = `${data.current.precipitation} mm`;
     uvIndexElement.textContent = Math.round(data.current.uv_index);
     
-    conditionElement.textContent = getWeatherDescription(data.current.weather_code);
+    descriptionElement.textContent = getWeatherDescription(data.current.weather_code);
     updateHourlyForecast(data.hourly);
 
     // Update detailed cards
@@ -375,50 +381,6 @@ function updateWeatherDisplays(data) {
     initCanvases();
     updateTimeDisplay();
     updateVisualizations();
-}
-
-function getUVIndexDescription(uvIndex) {
-    if (uvIndex <= 2) return 'Low';
-    if (uvIndex <= 5) return 'Moderate';
-    if (uvIndex <= 7) return 'High';
-    if (uvIndex <= 10) return 'Very High';
-    return 'Extreme';
-}
-
-function getAirQualityDescription(aqi) {
-    if (aqi <= 50) return 'Good';
-    if (aqi <= 100) return 'Moderate';
-    if (aqi <= 150) return 'Unhealthy for Sensitive Groups';
-    if (aqi <= 200) return 'Unhealthy';
-    if (aqi <= 300) return 'Very Unhealthy';
-    return 'Hazardous';
-}
-
-function getAirQualityImplication(aqi) {
-    if (aqi <= 50) return 'Air quality is satisfactory, and air pollution poses little or no risk.';
-    if (aqi <= 100) return 'Acceptable air quality, but some pollutants may affect very sensitive individuals.';
-    if (aqi <= 150) return 'Members of sensitive groups may experience health effects.';
-    if (aqi <= 200) return 'Everyone may begin to experience health effects.';
-    if (aqi <= 300) return 'Health warnings of emergency conditions. Entire population affected.';
-    return 'Health alert: everyone may experience serious health effects.';
-}
-
-function getAirQualityColor(aqi) {
-    if (aqi <= 50) return '#00e400';  // Green
-    if (aqi <= 100) return '#ffff00';  // Yellow
-    if (aqi <= 150) return '#ff7e00';  // Orange
-    if (aqi <= 200) return '#ff0000';  // Red
-    if (aqi <= 300) return '#8f3f97';  // Purple
-    return '#7e0023';  // Maroon
-}
-
-function getVisibilityDescription(visibility) {
-    const visibilityKm = visibility / 1000;
-    if (visibilityKm >= 10) return 'Excellent';
-    if (visibilityKm >= 5) return 'Good';
-    if (visibilityKm >= 2) return 'Moderate';
-    if (visibilityKm >= 1) return 'Poor';
-    return 'Very Poor';
 }
 
 function updateTimeDisplay() {
@@ -524,13 +486,6 @@ function drawPrecipitation() {
     document.getElementById('precipitation-chance-large').textContent = `${currentProb}%`;
     const precipDesc = document.querySelector('.precipitation-large-card .card-description');
     precipDesc.textContent = `${currentAmount.toFixed(1)}mm - ${getPrecipitationIntensity(currentIntensity)}`;
-}
-
-function getPrecipitationIntensity(intensity) {
-    if (intensity < 0.5) return 'Light';
-    if (intensity < 2) return 'Moderate';
-    if (intensity < 10) return 'Heavy';
-    return 'Very Heavy';
 }
 
 function drawWind() {
@@ -668,17 +623,17 @@ async function init() {
 
 async function updateWeather(latitude, longitude, locationName) {
     try {
-        document.getElementById('loading').style.display = 'flex';
-        document.getElementById('error').textContent = '';
+        loadingElement.style.display = 'flex';
+        errorElement.textContent = '';
         
         currentWeatherData = await getWeatherData(latitude, longitude, locationName);
         updateDisplay();
         
-        document.getElementById('loading').style.display = 'none';
+        loadingElement.style.display = 'none';
     } catch (error) {
         console.error('Error updating weather:', error);
-        document.getElementById('error').textContent = error.message;
-        document.getElementById('loading').style.display = 'none';
+        errorElement.textContent = error.message;
+        loadingElement.style.display = 'none';
     }
 }
 
@@ -686,15 +641,15 @@ function updateDisplay() {
     if (!currentWeatherData) return;
 
     // Update location and current conditions
-    document.getElementById('location').textContent = currentWeatherData.location_name;
-    document.getElementById('temperature').textContent = 
+    locationElement.textContent = currentWeatherData.location_name;
+    temperatureElement.textContent = 
         `${Math.round(convertTemperature(currentWeatherData.current.temperature_2m, 'F'))}°F`;
-    document.getElementById('description').textContent = 
+    descriptionElement.textContent = 
         getWeatherDescription(currentWeatherData.current.weather_code);
     
     // Update weather icon
     const iconClass = getWeatherIcon(currentWeatherData.current.weather_code);
-    document.getElementById('weather-icon').className = `fas ${iconClass}`;
+    weatherIconElement.className = `fas ${iconClass}`;
 
     // Update hourly visualizations
     updateHourlyVisualizations(currentWeatherData, currentHourIndex);
@@ -704,8 +659,7 @@ function updateDisplay() {
 }
 
 function updateInfoCards() {
-    const cards = document.querySelectorAll('.info-card');
-    cards.forEach(card => {
+    infoCards.forEach(card => {
         const type = card.getAttribute('data-type');
         const value = card.querySelector('.value');
         const description = card.querySelector('.description');
@@ -733,33 +687,6 @@ function updateInfoCards() {
         }
     });
 }
-
-// Event Listeners
-document.getElementById('search-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const location = document.getElementById('search-input').value.trim();
-    if (!location) return;
-
-    try {
-        document.getElementById('error').textContent = '';
-        const coordinates = await getCoordinates(location);
-        await updateWeather(coordinates.latitude, coordinates.longitude, coordinates.name);
-    } catch (error) {
-        console.error('Search error:', error);
-        document.getElementById('error').textContent = error.message;
-    }
-});
-
-document.getElementById('current-location').addEventListener('click', async () => {
-    try {
-        document.getElementById('error').textContent = '';
-        const locationData = await getCurrentLocation();
-        await updateWeather(locationData.latitude, locationData.longitude, locationData.name);
-    } catch (error) {
-        console.error('Location error:', error);
-        document.getElementById('error').textContent = error.message;
-    }
-});
 
 // Initialize the app
 init();
