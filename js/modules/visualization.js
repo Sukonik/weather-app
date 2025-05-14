@@ -82,4 +82,140 @@ export function updateHourlyVisualizations(weatherData, currentHourIndex) {
             formatValue: (speed) => formatSpeed(speed, 'mph')
         });
     }
+}
+
+class RainDrop {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * -100;
+        this.speed = 2 + Math.random() * 2;
+        this.length = 10 + Math.random() * 10;
+    }
+
+    update(intensity) {
+        this.y += this.speed * (intensity / 2 + 0.5);
+        if (this.y > this.canvas.height) {
+            this.y = Math.random() * -100;
+            this.x = Math.random() * this.canvas.width;
+        }
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x, this.y + this.length);
+        ctx.stroke();
+    }
+}
+
+class WindParticle {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.reset();
+        this.radius = 1 + Math.random();
+    }
+
+    reset() {
+        this.x = Math.random() * -100;
+        this.y = Math.random() * this.canvas.height;
+    }
+
+    update(speed) {
+        this.x += speed / 5;
+        if (this.x > this.canvas.width) {
+            this.reset();
+        }
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+export function initializeAnimations(precipCanvas, windCanvas) {
+    const raindrops = Array.from({ length: 50 }, () => new RainDrop(precipCanvas));
+    const windParticles = Array.from({ length: 100 }, () => new WindParticle(windCanvas));
+    
+    return { raindrops, windParticles };
+}
+
+export function updatePrecipitationDisplay(canvas, data, hourIndex, isNext8Hours = false) {
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Get precipitation data
+    const precipProb = data.hourly.precipitation_probability;
+    const precipAmount = data.hourly.precipitation;
+    const endIndex = isNext8Hours ? hourIndex + 8 : hourIndex + 1;
+    const currentProb = precipProb[hourIndex];
+    const currentAmount = precipAmount[hourIndex];
+
+    // Update display values
+    const probDisplay = document.getElementById('precip-probability');
+    const timeDisplay = document.getElementById('precip-time');
+    
+    probDisplay.textContent = `${currentProb}%`;
+    const time = new Date(data.hourly.time[hourIndex]);
+    timeDisplay.textContent = time.toLocaleTimeString('en-US', { 
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    // Animation settings
+    ctx.strokeStyle = 'rgba(0, 122, 255, 0.6)';
+    ctx.lineWidth = 1;
+
+    return { probability: currentProb, amount: currentAmount };
+}
+
+export function updateWindDisplay(canvas, data, hourIndex, isNext8Hours = false) {
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Get wind data
+    const windSpeed = data.hourly.wind_speed_10m;
+    const windDir = data.hourly.wind_direction_10m;
+    const endIndex = isNext8Hours ? hourIndex + 8 : hourIndex + 1;
+    const currentSpeed = windSpeed[hourIndex];
+    const currentDir = windDir[hourIndex];
+
+    // Update display values
+    const speedDisplay = document.getElementById('wind-speed');
+    const dirDisplay = document.getElementById('wind-direction');
+    const timeDisplay = document.getElementById('wind-time');
+    
+    speedDisplay.textContent = formatSpeed(currentSpeed, 'km/h');
+    dirDisplay.textContent = getWindDirection(currentDir);
+    const time = new Date(data.hourly.time[hourIndex]);
+    timeDisplay.textContent = time.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    // Animation settings
+    ctx.fillStyle = 'rgba(52, 199, 89, 0.6)';
+
+    return { speed: currentSpeed, direction: currentDir };
+}
+
+export function animate(ctx, particles, weatherParams) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    
+    particles.forEach(particle => {
+        particle.update(weatherParams.intensity || weatherParams.speed);
+        particle.draw(ctx);
+    });
 } 
