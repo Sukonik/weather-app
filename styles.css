@@ -54,10 +54,20 @@ body {
     transition: background-color 0.3s, color 0.3s;
 }
 
+/* Base styles */
+:root {
+    --container-width: min(1200px, 95%);
+    --card-min-width: 280px;
+    --card-max-width: 1fr;
+    --grid-gap: clamp(1rem, 2vw, 2rem);
+    --section-spacing: clamp(2rem, 4vw, 3rem);
+}
+
+/* Responsive container */
 .container {
-    max-width: 1200px;
+    width: var(--container-width);
     margin: 0 auto;
-    padding: 2rem;
+    padding: clamp(1rem, 2vw, 2rem);
 }
 
 .app-logo {
@@ -84,7 +94,7 @@ body {
     height: 40px;
     background-color: var(--accent);
     border-radius: 50%;
-    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.3);
+    box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.4);
 }
 
 .sun-rays {
@@ -125,16 +135,7 @@ body {
         var(--accent) 360deg
     );
     border-radius: 50%;
-    animation: rotate 10s linear infinite;
-}
-
-@keyframes rotate {
-    from {
-        transform: translate(-50%, -50%) rotate(0deg);
-    }
-    to {
-        transform: translate(-50%, -50%) rotate(360deg);
-    }
+    opacity: 0.8;
 }
 
 .logo-text {
@@ -145,10 +146,18 @@ body {
     font-size: 2.5rem;
     font-weight: 700;
     margin: 0;
-    background: linear-gradient(120deg, var(--accent), #fff);
+    background: linear-gradient(120deg, var(--accent) 30%, #fff 70%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: 1px;
+    text-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.3);
+}
+
+/* Add text shadow for light theme */
+:root[data-theme="light"] .logo-text h1 {
+    background: linear-gradient(120deg, var(--accent) 30%, #333 70%);
+    -webkit-background-clip: text;
+    text-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.4);
 }
 
 .logo-text span {
@@ -886,17 +895,18 @@ button:hover {
 
 .large-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    margin: 2rem 0;
+    grid-template-columns: repeat(auto-fit, minmax(var(--card-min-width), var(--card-max-width)));
+    gap: var(--grid-gap);
+    margin: var(--section-spacing) 0;
 }
 
 .large-card {
     background-color: var(--secondary-bg);
     border-radius: 16px;
-    padding: 1.5rem;
+    padding: clamp(1rem, 3vw, 1.5rem);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
 }
 
 .large-card:hover {
@@ -1035,5 +1045,124 @@ button:hover {
 
     .large-card canvas {
         min-height: 200px;
+    }
+}
+
+/* Responsive typography */
+h1 {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.temperature {
+    font-size: clamp(2rem, 6vw, 4rem);
+}
+
+.description {
+    font-size: clamp(1rem, 3vw, 1.25rem);
+}
+
+/* Mobile navigation */
+@media (max-width: 768px) {
+    .nav-container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .search-container {
+        width: 100%;
+    }
+
+    .search-input {
+        width: 100%;
+    }
+
+    .theme-selector {
+        justify-content: center;
+    }
+}
+
+/* Responsive hourly forecast */
+.hourly-forecast {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(80px, 1fr);
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 1rem 0;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+.forecast-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--secondary-bg);
+    border-radius: 12px;
+    min-width: 80px;
+}
+
+/* Touch-friendly interactions */
+button, 
+.search-input,
+.theme-option {
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+}
+
+/* Improved loading and error states */
+.loading,
+.error {
+    padding: 1rem;
+    text-align: center;
+    border-radius: 8px;
+    margin: 1rem 0;
+}
+
+.loading {
+    background: var(--secondary-bg);
+}
+
+.error {
+    background: rgba(255, 0, 0, 0.1);
+    color: #ff3b30;
+}
+
+/* Smooth transitions */
+.card-transition {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-transition:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Improved accessibility */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+    :root {
+        --accent: #0066cc;
+        --text-primary: #ffffff;
+        --text-secondary: #cccccc;
+    }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-bg: #1a1a1a;
+        --secondary-bg: #2a2a2a;
+        --text-primary: #ffffff;
+        --text-secondary: #b3b3b3;
     }
 }
