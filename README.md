@@ -1,4 +1,4 @@
-# Weather App
+# ClearSky Weather App
 
 A modern, responsive weather application with real-time data and beautiful UI. Built with HTML, CSS, and JavaScript.
 
