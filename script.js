@@ -15,15 +15,16 @@ import {
 import { updateHourlyVisualizations, initializeAnimations, updatePrecipitationDisplay, updateWindDisplay, animate } from './js/modules/visualization.js';
 
 document.addEventListener('DOMContentLoaded', function() {
-    // DOM Elements
+    // DOM Elements (fixed selectors)
     const searchForm = document.getElementById('search-form');
-    const searchInput = document.getElementById('search-input');
-    const currentLocationBtn = document.getElementById('current-location');
+    const searchInput = document.getElementById('location-search');
+    const searchBtn = document.getElementById('search-btn');
+    const currentLocationBtn = document.getElementById('current-location-btn');
     const errorElement = document.getElementById('error');
     const loadingElement = document.getElementById('loading');
-    const locationElement = document.getElementById('location');
-    const temperatureElement = document.getElementById('temperature');
-    const descriptionElement = document.getElementById('description');
+    const locationElement = document.querySelector('.location');
+    const temperatureElement = document.querySelector('.temperature');
+    const descriptionElement = document.querySelector('.condition');
     const weatherIconElement = document.getElementById('weather-icon');
     const precipCanvas = document.getElementById('precipCanvas');
     const windCanvas = document.getElementById('windCanvas');
@@ -36,6 +37,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const precipForecastBtn = document.getElementById('precip-forecast');
     const windCurrentBtn = document.getElementById('wind-current');
     const windForecastBtn = document.getElementById('wind-forecast');
+    const searchSuggestions = document.getElementById('search-suggestions');
+    const currentTimeElement = document.querySelector('.current-time');
+    const currentDateElement = document.querySelector('.current-date');
+    const windElement = document.getElementById('wind');
+    const humidityElement = document.getElementById('humidity');
+    const precipitationElement = document.getElementById('precipitation');
+    const uvIndexElement = document.getElementById('uv-index');
+    const feelsLikeElement = document.querySelector('.feels-like');
+    // Add more as needed for your UI
+
+    // Define unit/theme/speed/aqi controls if present
+    const unitToggleBtns = document.querySelectorAll('.unit-btn');
+    const themeBtn = document.getElementById('theme-btn');
+    const themeDropdown = document.querySelector('.theme-dropdown');
+    const themeOptions = document.querySelectorAll('.theme-option');
+    const speedUnitBtns = document.querySelectorAll('.speed-unit-btn');
+    const aqiInfoBtn = document.getElementById('aqi-info-btn');
+    const aqiInfoModal = document.getElementById('aqi-info-modal');
+    const modalCloseBtn = aqiInfoModal ? aqiInfoModal.querySelector('.close-btn') : null;
 
     let currentWeatherData = null;
     let currentHourIndex = 0;
@@ -62,12 +82,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const location = searchInput?.value.trim();
             if (!location) return;
             try {
-                errorElement.textContent = '';
+                if (errorElement) errorElement.textContent = '';
                 const coordinates = await getCoordinates(location);
                 await updateWeather(coordinates.latitude, coordinates.longitude, coordinates.name);
             } catch (error) {
                 console.error('Search error:', error);
-                errorElement.textContent = error.message;
+                if (errorElement) errorElement.textContent = error.message;
+            }
+        });
+    }
+    if (searchBtn && searchInput) {
+        searchBtn.addEventListener('click', async () => {
+            const location = searchInput.value.trim();
+            if (!location) return;
+            try {
+                if (errorElement) errorElement.textContent = '';
+                const coordinates = await getCoordinates(location);
+                await updateWeather(coordinates.latitude, coordinates.longitude, coordinates.name);
+            } catch (error) {
+                console.error('Search error:', error);
+                if (errorElement) errorElement.textContent = error.message;
             }
         });
     }
