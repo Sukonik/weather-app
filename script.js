@@ -83,11 +83,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!location) return;
             try {
                 if (errorElement) errorElement.textContent = '';
+                if (loadingElement) loadingElement.style.display = 'flex';
                 const coordinates = await getCoordinates(location);
                 await updateWeather(coordinates.latitude, coordinates.longitude, coordinates.name);
             } catch (error) {
                 console.error('Search error:', error);
-                if (errorElement) errorElement.textContent = error.message;
+                if (errorElement) errorElement.textContent = error.message || 'Error searching location';
+                if (loadingElement) loadingElement.style.display = 'none';
             }
         });
     }
@@ -579,20 +581,20 @@ document.addEventListener('DOMContentLoaded', function() {
     async function init() {
         try {
             if (!navigator.geolocation) {
-                throw new Error('Geolocation is not supported by your browser');
+                throw new Error('Geolocation is not supported by your browser. Please use the search bar to enter a location.');
             }
             
-            loadingElement.style.display = 'flex';
-            errorElement.textContent = '';
+            if (loadingElement) loadingElement.style.display = 'flex';
+            if (errorElement) errorElement.textContent = '';
             
             const locationData = await getCurrentLocation();
             await updateWeather(locationData.latitude, locationData.longitude, locationData.name);
         } catch (error) {
             console.error('Error initializing weather:', error);
             if (errorElement) {
-                errorElement.textContent = 'Unable to get location. Please use the search bar to enter a location manually.';
-                loadingElement.style.display = 'none';
+                errorElement.textContent = error.message || 'Unable to get location. Please use the search bar to enter a location manually.';
             }
+            if (loadingElement) loadingElement.style.display = 'none';
         }
     }
 
@@ -695,3 +697,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (errorElement) errorElement.textContent = error.message;
     }
 });
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    currentTheme = theme;
+}
