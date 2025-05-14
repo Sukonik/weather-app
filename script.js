@@ -578,27 +578,61 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function init() {
         try {
+            if (!navigator.geolocation) {
+                throw new Error('Geolocation is not supported by your browser');
+            }
+            
+            loadingElement.style.display = 'flex';
+            errorElement.textContent = '';
+            
             const locationData = await getCurrentLocation();
             await updateWeather(locationData.latitude, locationData.longitude, locationData.name);
         } catch (error) {
             console.error('Error initializing weather:', error);
-            document.getElementById('error').textContent = error.message;
+            if (errorElement) {
+                errorElement.textContent = 'Unable to get location. Please use the search bar to enter a location manually.';
+                loadingElement.style.display = 'none';
+            }
         }
     }
 
     async function updateWeather(latitude, longitude, locationName) {
         try {
-            loadingElement.style.display = 'flex';
-            errorElement.textContent = '';
+            if (loadingElement) loadingElement.style.display = 'flex';
+            if (errorElement) errorElement.textContent = '';
             
-            currentWeatherData = await getWeatherData(latitude, longitude, locationName);
-            updateDisplay();
+            const data = await getWeatherData(latitude, longitude, locationName);
+            currentWeatherData = data;
             
-            loadingElement.style.display = 'none';
+            // Update all displays
+            locationElement.textContent = locationName;
+            const temp = Math.round(convertTemperature(data.current.temperature_2m, currentUnit));
+            temperatureElement.textContent = temp;
+            document.querySelector('.unit').textContent = `°${currentUnit}`;
+            
+            const feelsLikeTemp = Math.round(convertTemperature(data.current.apparent_temperature, currentUnit));
+            feelsLikeElement.textContent = `Feels like: ${feelsLikeTemp}°`;
+            
+            descriptionElement.textContent = getWeatherDescription(data.current.weather_code);
+            
+            // Update weather details
+            windElement.textContent = `${Math.round(data.current.wind_speed_10m)} ${currentSpeedUnit}`;
+            humidityElement.textContent = `${Math.round(data.current.relative_humidity_2m)}%`;
+            precipitationElement.textContent = `${data.current.precipitation} mm`;
+            uvIndexElement.textContent = Math.round(data.current.uv_index);
+            
+            // Initialize visualizations
+            setupHourlyAnimations();
+            updateHourlyPrecipitation();
+            updateHourlyWind();
+            
+            if (loadingElement) loadingElement.style.display = 'none';
         } catch (error) {
             console.error('Error updating weather:', error);
-            errorElement.textContent = error.message;
-            loadingElement.style.display = 'none';
+            if (errorElement) {
+                errorElement.textContent = 'Unable to fetch weather data. Please try again.';
+                if (loadingElement) loadingElement.style.display = 'none';
+            }
         }
     }
 
