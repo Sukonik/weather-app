@@ -22,6 +22,11 @@ const speedUnitBtns = document.querySelectorAll('.speed-unit-btn');
 const aqiInfoBtn = document.getElementById('aqi-info-btn');
 const aqiInfoModal = document.getElementById('aqi-info-modal');
 const modalCloseBtn = aqiInfoModal.querySelector('.close-btn');
+const precipCanvas = document.getElementById('precipitation-canvas');
+const windCanvas = document.getElementById('wind-canvas');
+const timeDisplay = document.getElementById('time-display');
+const prevHourBtn = document.getElementById('prev-hour');
+const nextHourBtn = document.getElementById('next-hour');
 
 // State
 let currentUnit = localStorage.getItem('unit') || 'C';
@@ -29,6 +34,9 @@ let currentWeatherData = null;
 let searchTimeout = null;
 let currentTheme = localStorage.getItem('theme') || 'dark';
 let currentSpeedUnit = localStorage.getItem('speedUnit') || 'km/h';
+let currentHourIndex = 0;
+let animationFrame;
+let particles = [];
 
 // Initialize theme and unit
 setTheme(currentTheme);
@@ -130,10 +138,22 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+prevHourBtn?.addEventListener('click', () => {
+    currentHourIndex = Math.max(0, currentHourIndex - 1);
+    updateTimeDisplay();
+    updateVisualizations();
+});
+
+nextHourBtn?.addEventListener('click', () => {
+    currentHourIndex = Math.min(11, currentHourIndex + 1);
+    updateTimeDisplay();
+    updateVisualizations();
+});
+
 // Error Handler
 function handleError(error) {
     console.error('Error:', error);
-    alert('An error occurred. Please try again.');
+    alert(error.message || 'An error occurred. Please try again.');
 }
 
 // Time update
@@ -311,13 +331,19 @@ async function getWeatherData(latitude, longitude, locationName) {
             )
         ]);
 
-        if (!weatherResponse.ok || !airQualityResponse.ok) 
-            throw new Error('Network response was not ok');
-        
+        if (!weatherResponse.ok) {
+            throw new Error('Weather data not available');
+        }
+
         const [weatherData, airQualityData] = await Promise.all([
             weatherResponse.json(),
-            airQualityResponse.json()
+            airQualityResponse.ok ? airQualityResponse.json() : { current: {} }
         ]);
+
+        // Validate essential weather data
+        if (!weatherData.current || !weatherData.hourly) {
+            throw new Error('Invalid weather data format');
+        }
 
         currentWeatherData = {
             ...weatherData,
@@ -326,9 +352,10 @@ async function getWeatherData(latitude, longitude, locationName) {
         
         locationElement.textContent = locationName;
         updateWeatherDisplays(currentWeatherData);
+        return true;
     } catch (error) {
-        console.error('Error:', error);
-        throw new Error('Error fetching weather data. Please try again.');
+        console.error('Weather data error:', error);
+        throw new Error('Unable to fetch weather data. Please try again.');
     }
 }
 
@@ -414,22 +441,45 @@ function getWeatherIcon(code) {
 
 async function getCurrentLocation() {
     if (!navigator.geolocation) {
-        throw new Error('Geolocation is not supported by your browser');
+        console.warn('Geolocation not supported');
+        await getWeatherData(40.7128, -74.0060, 'New York');
+        return;
     }
 
     try {
         const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject);
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0
+            });
         });
 
         const { latitude, longitude } = position.coords;
-        await getWeatherData(latitude, longitude, 'Current Location');
-    } catch (error) {
-        if (error.code === 1) {
-            throw new Error('Location access denied. Please enable location access or search manually.');
-        } else {
-            throw new Error('Unable to retrieve your location. Please try searching manually.');
+        
+        try {
+            const response = await fetch(
+                `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}`,
+                { mode: 'cors' }
+            );
+            
+            if (!response.ok) throw new Error('Reverse geocoding failed');
+            
+            const data = await response.json();
+            const locationName = data?.results?.[0]?.name || 'Current Location';
+            await getWeatherData(latitude, longitude, locationName);
+        } catch (error) {
+            console.warn('Reverse geocoding failed:', error);
+            await getWeatherData(latitude, longitude, 'Current Location');
         }
+    } catch (error) {
+        console.error('Geolocation error:', error);
+        const errorMessage = error.code === 1 ? 'Location access denied' :
+                           error.code === 2 ? 'Location unavailable' :
+                           error.code === 3 ? 'Location request timed out' :
+                           'Unable to get location';
+        console.warn(errorMessage + '. Using default location.');
+        await getWeatherData(40.7128, -74.0060, 'New York');
     }
 }
 
@@ -445,13 +495,134 @@ function setTheme(theme) {
 
 // Initialize with user's location if possible
 document.addEventListener('DOMContentLoaded', () => {
-    getCurrentLocation().catch(() => {
-        // If geolocation fails, load New York as default
+    getCurrentLocation().catch(error => {
+        console.error('Startup error:', error);
+        // Load New York as default if everything fails
         getWeatherData(40.7128, -74.0060, 'New York').catch(handleError);
     });
 });
 
-// New function to update all weather displays
+function updatePrecipitationVisualization(hourlyData) {
+    const precipViz = document.getElementById('precipitation-viz');
+    precipViz.innerHTML = '';
+
+    // Get the next 24 hours of precipitation data
+    const next24Hours = hourlyData.precipitation_probability.slice(0, 24);
+    const maxPrecip = Math.max(...next24Hours, 20); // minimum 20% for visibility
+
+    next24Hours.forEach((prob, index) => {
+        const bar = document.createElement('div');
+        bar.className = 'precipitation-bar';
+        
+        // Calculate height percentage (minimum 5% for visibility)
+        const heightPercent = Math.max((prob / maxPrecip) * 100, 5);
+        bar.style.height = `${heightPercent}%`;
+
+        // Calculate blue intensity based on precipitation probability
+        const blueBase = 155; // Base blue value
+        const blueRange = 100; // Range of blue values
+        const blueIntensity = Math.floor(blueBase + (prob / 100) * blueRange);
+        const opacity = 0.3 + (prob / 100) * 0.7; // Opacity ranges from 0.3 to 1.0
+        
+        bar.style.backgroundColor = `rgba(0, 127, ${blueIntensity}, ${opacity})`;
+
+        // Add animation for bars with precipitation
+        if (prob > 10) { // Animate if probability is greater than 10%
+            bar.classList.add('active');
+        }
+
+        // Add tooltip with time and probability
+        const hour = new Date(hourlyData.time[index]);
+        const timeStr = hour.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            hour12: true 
+        });
+        bar.title = `${timeStr}: ${prob}% chance of rain`;
+
+        precipViz.appendChild(bar);
+    });
+}
+
+function updateHourlyCharts(hourlyData) {
+    // Update precipitation chart
+    const precipChart = document.getElementById('precipitation-chart');
+    const precipTimeLabels = document.getElementById('precipitation-time-labels');
+    const precipChanceLarge = document.getElementById('precipitation-chance-large');
+    
+    precipChart.innerHTML = '';
+    precipTimeLabels.innerHTML = '';
+
+    // Get next 12 hours of data
+    const next12Hours = hourlyData.precipitation_probability.slice(0, 12);
+    const maxPrecip = Math.max(...next12Hours, 20);
+
+    // Update current precipitation chance
+    precipChanceLarge.textContent = `${next12Hours[0]}%`;
+
+    // Create bars and labels
+    next12Hours.forEach((prob, index) => {
+        // Create bar
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar rain';
+        const height = Math.max((prob / maxPrecip) * 100, 5);
+        bar.style.height = `${height}%`;
+        
+        // Add tooltip
+        const time = new Date(hourlyData.time[index]);
+        const timeStr = time.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+        bar.setAttribute('data-tooltip', `${timeStr}: ${prob}% chance of rain`);
+        
+        precipChart.appendChild(bar);
+
+        // Add time label if it's at 3-hour intervals
+        if (index % 3 === 0) {
+            const label = document.createElement('span');
+            label.textContent = timeStr;
+            precipTimeLabels.appendChild(label);
+        }
+    });
+
+    // Update wind chart
+    const windChart = document.getElementById('wind-chart');
+    const windTimeLabels = document.getElementById('wind-time-labels');
+    const windSpeedLarge = document.getElementById('wind-speed-large');
+    
+    windChart.innerHTML = '';
+    windTimeLabels.innerHTML = '';
+
+    // Get next 12 hours of wind data
+    const windSpeeds = hourlyData.wind_speed_10m.slice(0, 12);
+    const maxWind = Math.max(...windSpeeds);
+
+    // Update current wind speed
+    windSpeedLarge.textContent = formatSpeed(windSpeeds[0]);
+
+    // Create bars and labels
+    windSpeeds.forEach((speed, index) => {
+        // Create bar
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar wind';
+        const height = Math.max((speed / maxWind) * 100, 5);
+        bar.style.height = `${height}%`;
+        
+        // Add tooltip
+        const time = new Date(hourlyData.time[index]);
+        const timeStr = time.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+        const direction = getWindDirection(hourlyData.wind_direction_10m[index]);
+        bar.setAttribute('data-tooltip', `${timeStr}: ${formatSpeed(speed)} ${direction}`);
+        
+        windChart.appendChild(bar);
+
+        // Add time label if it's at 3-hour intervals
+        if (index % 3 === 0) {
+            const label = document.createElement('span');
+            label.textContent = timeStr;
+            windTimeLabels.appendChild(label);
+        }
+    });
+}
+
+// Update the updateWeatherDisplays function to include the new charts
 function updateWeatherDisplays(data) {
     updateTemperatureDisplays(data);
     
@@ -527,6 +698,21 @@ function updateWeatherDisplays(data) {
     const visibilityKm = (visibilityMeters / 1000).toFixed(1);
     document.getElementById('visibility-value').textContent = `${visibilityKm} km`;
     document.getElementById('visibility-status').textContent = getVisibilityDescription(visibilityMeters);
+
+    // Update precipitation visualization
+    if (data.hourly) {
+        updatePrecipitationVisualization(data.hourly);
+    }
+
+    // Update hourly charts
+    if (data.hourly) {
+        updateHourlyCharts(data.hourly);
+    }
+
+    // Initialize and update visualizations
+    initCanvases();
+    updateTimeDisplay();
+    updateVisualizations();
 }
 
 function getUVIndexDescription(uvIndex) {
@@ -572,3 +758,267 @@ function getVisibilityDescription(visibility) {
     if (visibilityKm >= 1) return 'Poor';
     return 'Very Poor';
 }
+
+function updateTimeDisplay() {
+    if (!currentWeatherData) return;
+    const time = new Date(currentWeatherData.hourly.time[currentHourIndex]);
+    const hour = time.getHours();
+    const hourStr = hour % 12 || 12;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    timeDisplay.textContent = `${hourStr}:00 ${ampm}`;
+}
+
+function initCanvases() {
+    // Set canvas sizes
+    const setCanvasSize = (canvas) => {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        return { width: rect.width, height: rect.height };
+    };
+
+    const precipSize = setCanvasSize(precipCanvas);
+    const windSize = setCanvasSize(windCanvas);
+
+    // Initialize particles
+    particles = [];
+    const particleCount = 50; // Reduced for better performance
+    
+    if (precipSize && windSize) {
+        for (let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * precipSize.width,
+                y: Math.random() * precipSize.height,
+                windX: Math.random() * windSize.width,
+                windY: Math.random() * windSize.height,
+                speed: 1 + Math.random() * 2,
+                size: 1 + Math.random() * 2
+            });
+        }
+    }
+
+    // Start animations if we have weather data
+    if (currentWeatherData) {
+        updateVisualizations();
+    }
+}
+
+function drawPrecipitation() {
+    if (!precipCanvas || !currentWeatherData) return;
+    const ctx = precipCanvas.getContext('2d');
+    const rect = precipCanvas.getBoundingClientRect();
+    const { width, height } = rect;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+    
+    // Set background
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillRect(0, 0, width, height);
+    
+    const hours = 12;
+    const padding = 40;
+    const graphWidth = width - (padding * 2);
+    const graphHeight = height - (padding * 2);
+    const hourWidth = graphWidth / hours;
+    
+    // Draw time axis
+    ctx.beginPath();
+    ctx.moveTo(padding, height - padding);
+    ctx.lineTo(width - padding, height - padding);
+    ctx.strokeStyle = '#999';
+    ctx.stroke();
+    
+    // Draw precipitation data
+    const startHour = currentHourIndex;
+    const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+    gradient.addColorStop(0, 'rgba(0, 127, 255, 0.8)');  // Heavy
+    gradient.addColorStop(0.33, 'rgba(0, 127, 255, 0.5)'); // Medium
+    gradient.addColorStop(0.66, 'rgba(0, 127, 255, 0.2)'); // Light
+    
+    // Draw intensity levels
+    ctx.font = '12px Inter';
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'right';
+    ctx.fillText('Heavy', padding - 5, padding + 20);
+    ctx.fillText('Med', padding - 5, padding + graphHeight * 0.5);
+    ctx.fillText('Light', padding - 5, height - padding - 5);
+    
+    // Draw precipitation area
+    ctx.beginPath();
+    ctx.moveTo(padding, height - padding);
+    
+    for (let i = 0; i < hours; i++) {
+        const hourOffset = (startHour + i) % 24;
+        const prob = currentWeatherData.hourly.precipitation_probability[hourOffset];
+        const x = padding + (i * hourWidth);
+        const intensity = prob / 100;
+        const y = height - padding - (graphHeight * intensity);
+        
+        if (i === 0) {
+            ctx.moveTo(x, height - padding);
+        }
+        ctx.lineTo(x, y);
+    }
+    
+    // Complete the area
+    ctx.lineTo(width - padding, height - padding);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // Draw time labels
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    
+    for (let i = 0; i < hours; i += 2) {
+        const hourOffset = (startHour + i) % 24;
+        const time = new Date(currentWeatherData.hourly.time[hourOffset]);
+        const hour = time.getHours();
+        const hourStr = hour % 12 || 12;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const x = padding + (i * hourWidth);
+        
+        ctx.fillText(`${hourStr}${ampm}`, x, height - padding + 5);
+    }
+    
+    // Draw current conditions
+    const currentProb = currentWeatherData.hourly.precipitation_probability[currentHourIndex];
+    ctx.font = 'bold 16px Inter';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#333';
+    ctx.fillText(`${currentProb}% chance of rain`, padding, padding - 10);
+    
+    if (currentProb > 0) {
+        let intensity = 'Light';
+        if (currentProb > 70) intensity = 'Heavy';
+        else if (currentProb > 30) intensity = 'Medium';
+        ctx.fillText(`${intensity} Rain`, padding + 150, padding - 10);
+    }
+}
+
+function drawWind() {
+    if (!windCanvas || !currentWeatherData) return;
+    const ctx = windCanvas.getContext('2d');
+    const rect = windCanvas.getBoundingClientRect();
+    const { width, height } = rect;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+    
+    // Set background
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillRect(0, 0, width, height);
+    
+    const hours = 12;
+    const padding = 40;
+    const graphWidth = width - (padding * 2);
+    const graphHeight = height - (padding * 2);
+    const hourWidth = graphWidth / hours;
+    
+    // Draw time axis
+    ctx.beginPath();
+    ctx.moveTo(padding, height - padding);
+    ctx.lineTo(width - padding, height - padding);
+    ctx.strokeStyle = '#999';
+    ctx.stroke();
+    
+    // Draw wind speed bars and direction arrows
+    const startHour = currentHourIndex;
+    const maxSpeed = Math.max(...currentWeatherData.hourly.wind_speed_10m.slice(startHour, startHour + hours));
+    
+    for (let i = 0; i < hours; i++) {
+        const hourOffset = (startHour + i) % 24;
+        const speed = currentWeatherData.hourly.wind_speed_10m[hourOffset];
+        const direction = currentWeatherData.hourly.wind_direction_10m[hourOffset];
+        
+        const x = padding + (i * hourWidth);
+        const barHeight = (speed / maxSpeed) * graphHeight;
+        const y = height - padding - barHeight;
+        
+        // Draw wind speed bar
+        ctx.fillStyle = `rgba(46, 204, 113, ${Math.min(speed / 20, 0.8)})`;
+        ctx.fillRect(x, y, hourWidth * 0.8, barHeight);
+        
+        // Draw wind direction arrow
+        const arrowSize = 15;
+        const arrowAngle = (direction - 90) * Math.PI / 180;
+        const arrowX = x + (hourWidth * 0.4);
+        const arrowY = y + (barHeight / 2);
+        
+        ctx.save();
+        ctx.translate(arrowX, arrowY);
+        ctx.rotate(arrowAngle);
+        
+        ctx.beginPath();
+        ctx.moveTo(-arrowSize/2, 0);
+        ctx.lineTo(arrowSize/2, 0);
+        ctx.lineTo(arrowSize/4, -arrowSize/4);
+        ctx.moveTo(arrowSize/2, 0);
+        ctx.lineTo(arrowSize/4, arrowSize/4);
+        
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    
+    // Draw time labels
+    ctx.fillStyle = '#333';
+    ctx.font = '12px Inter';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    
+    for (let i = 0; i < hours; i += 2) {
+        const hourOffset = (startHour + i) % 24;
+        const time = new Date(currentWeatherData.hourly.time[hourOffset]);
+        const hour = time.getHours();
+        const hourStr = hour % 12 || 12;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const x = padding + (i * hourWidth);
+        
+        ctx.fillText(`${hourStr}${ampm}`, x, height - padding + 5);
+    }
+    
+    // Draw speed labels on y-axis
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+        const speed = (maxSpeed * i / 4);
+        const y = height - padding - (graphHeight * i / 4);
+        ctx.fillText(`${Math.round(speed)} ${currentSpeedUnit}`, padding - 5, y);
+    }
+    
+    // Draw current conditions
+    const currentSpeed = currentWeatherData.hourly.wind_speed_10m[currentHourIndex];
+    const currentDir = getWindDirection(currentWeatherData.hourly.wind_direction_10m[currentHourIndex]);
+    
+    ctx.font = 'bold 16px Inter';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#333';
+    ctx.fillText(`${Math.round(currentSpeed)} ${currentSpeedUnit} ${currentDir}`, padding, padding - 10);
+}
+
+function updateVisualizations() {
+    if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+    }
+    
+    // Start both animations
+    drawPrecipitation();
+    drawWind();
+}
+
+// Add resize observer for better canvas resizing
+const resizeObserver = new ResizeObserver(() => {
+    initCanvases();
+});
+
+// Observe both canvases
+if (precipCanvas) resizeObserver.observe(precipCanvas);
+if (windCanvas) resizeObserver.observe(windCanvas);
