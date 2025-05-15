@@ -14,6 +14,27 @@ import {
 } from '/weather-app/js/modules/utils.js';
 import { updateHourlyVisualizations, initializeAnimations, updatePrecipitationDisplay, updateWindDisplay, animate } from '/weather-app/js/modules/visualization.js';
 
+// Global state
+let currentWeatherData = null;
+let currentHourIndex = 0;
+let currentUnit = localStorage.getItem('unit') || 'C';
+let currentSpeedUnit = localStorage.getItem('speedUnit') || 'km/h';
+let currentTheme = localStorage.getItem('theme') || 'dark';
+let searchTimeout = null;
+let animationFrame;
+let particles = [];
+let precipMode = 'current'; // 'current' or 'forecast'
+let windMode = 'current';
+let rainParticles = [];
+let windParticles = [];
+
+// Theme management
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    currentTheme = theme;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements (fixed selectors)
     const searchForm = document.getElementById('search-form');
@@ -57,18 +78,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const aqiInfoModal = document.getElementById('aqi-info-modal');
     const modalCloseBtn = aqiInfoModal ? aqiInfoModal.querySelector('.close-btn') : null;
 
-    let currentWeatherData = null;
-    let currentHourIndex = 0;
-    let currentUnit = localStorage.getItem('unit') || 'C';
-    let currentSpeedUnit = localStorage.getItem('speedUnit') || 'km/h';
-    let currentTheme = localStorage.getItem('theme') || 'dark';
     let searchTimeout = null;
     let animationFrame;
-    let particles = [];
-    let precipMode = 'current'; // 'current' or 'forecast'
-    let windMode = 'current';
-    let rainParticles = [];
-    let windParticles = [];
 
     // Initialize theme and unit
     setTheme(currentTheme);
@@ -697,9 +708,3 @@ document.addEventListener('DOMContentLoaded', function() {
         if (errorElement) errorElement.textContent = error.message;
     }
 });
-
-function setTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-    currentTheme = theme;
-}
