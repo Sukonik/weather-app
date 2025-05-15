@@ -1,3 +1,4 @@
+const baseUrl = window.location.hostname === 'sukonik.github.io' ? '/weather-app' : '';
 import { convertTemperature, formatSpeed, getWindDirection, getPrecipitationIntensity } from './utils.js';
 
 export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
