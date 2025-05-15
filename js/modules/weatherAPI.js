@@ -7,46 +7,51 @@ export async function getWeatherData(latitude, longitude, locationName) {
 
         console.log('Making API requests to:', { weatherUrl, airQualityUrl });
 
-        const [weatherResponse, airQualityResponse] = await Promise.all([
-            fetch(weatherUrl, { mode: 'cors' }),
-            fetch(airQualityUrl, { mode: 'cors' })
-        ]);
+        try {
+            const [weatherResponse, airQualityResponse] = await Promise.all([
+                fetch(weatherUrl),
+                fetch(airQualityUrl)
+            ]);
 
-        if (!weatherResponse.ok) {
-            const errorText = await weatherResponse.text();
-            console.error('Weather API error response:', errorText);
-            throw new Error(`Weather data not available: ${weatherResponse.status} ${weatherResponse.statusText}`);
+            if (!weatherResponse.ok) {
+                const errorText = await weatherResponse.text();
+                console.error('Weather API error response:', errorText);
+                throw new Error(`Weather data not available: ${weatherResponse.status} ${weatherResponse.statusText}`);
+            }
+
+            const weatherData = await weatherResponse.json();
+            console.log('Weather API response:', weatherData);
+
+            let airQualityData = { current: {} };
+            if (airQualityResponse.ok) {
+                airQualityData = await airQualityResponse.json();
+                console.log('Air Quality API response:', airQualityData);
+            } else {
+                console.warn('Air Quality API error:', airQualityResponse.status, airQualityResponse.statusText);
+            }
+
+            if (!weatherData.current || !weatherData.hourly) {
+                console.error('Invalid weather data format:', weatherData);
+                throw new Error('Invalid weather data format received from API');
+            }
+
+            const result = {
+                ...weatherData,
+                air_quality: airQualityData,
+                location_name: locationName
+            };
+
+            console.log('Final weather data:', result);
+            return result;
+        } catch (fetchError) {
+            console.error('API fetch error:', fetchError);
+            if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
+                throw new Error('Unable to connect to weather service. Please check your internet connection and try again.');
+            }
+            throw fetchError;
         }
-
-        const weatherData = await weatherResponse.json();
-        console.log('Weather API response:', weatherData);
-
-        let airQualityData = { current: {} };
-        if (airQualityResponse.ok) {
-            airQualityData = await airQualityResponse.json();
-            console.log('Air Quality API response:', airQualityData);
-        } else {
-            console.warn('Air Quality API error:', airQualityResponse.status, airQualityResponse.statusText);
-        }
-
-        if (!weatherData.current || !weatherData.hourly) {
-            console.error('Invalid weather data format:', weatherData);
-            throw new Error('Invalid weather data format received from API');
-        }
-
-        const result = {
-            ...weatherData,
-            air_quality: airQualityData,
-            location_name: locationName
-        };
-
-        console.log('Final weather data:', result);
-        return result;
     } catch (error) {
         console.error('Weather data error:', error);
-        if (error.message.includes('fetch')) {
-            throw new Error('Network error while fetching weather data. Please check your internet connection.');
-        }
         throw error;
     }
 }
@@ -57,34 +62,39 @@ export async function getCoordinates(location) {
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`;
         console.log('Geocoding API URL:', url);
 
-        const response = await fetch(url, { mode: 'cors' });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Geocoding API error:', errorText);
-            throw new Error(`Geocoding request failed: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Geocoding API response:', data);
+        try {
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Geocoding API error:', errorText);
+                throw new Error(`Geocoding request failed: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Geocoding API response:', data);
 
-        if (!data.results || !data.results.length) {
-            throw new Error(`Location "${location}" not found. Please try a different location.`);
+            if (!data.results || !data.results.length) {
+                throw new Error(`Location "${location}" not found. Please try a different location.`);
+            }
+            
+            const result = {
+                latitude: data.results[0].latitude,
+                longitude: data.results[0].longitude,
+                name: data.results[0].name
+            };
+            
+            console.log('Geocoding result:', result);
+            return result;
+        } catch (fetchError) {
+            console.error('Geocoding fetch error:', fetchError);
+            if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
+                throw new Error('Unable to connect to location service. Please check your internet connection and try again.');
+            }
+            throw fetchError;
         }
-        
-        const result = {
-            latitude: data.results[0].latitude,
-            longitude: data.results[0].longitude,
-            name: data.results[0].name
-        };
-        
-        console.log('Geocoding result:', result);
-        return result;
     } catch (error) {
         console.error('Geocoding error:', error);
-        if (error.message.includes('fetch')) {
-            throw new Error('Network error while searching location. Please check your internet connection.');
-        }
         throw error;
     }
 }
@@ -111,7 +121,7 @@ export async function getCurrentLocation() {
             const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}`;
             console.log('Reverse geocoding URL:', url);
             
-            const response = await fetch(url, { mode: 'cors' });
+            const response = await fetch(url);
             
             if (!response.ok) {
                 const errorText = await response.text();
