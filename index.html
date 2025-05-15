@@ -114,93 +114,27 @@
                 </div>
             </div>
 
-            <div class="hourly-section">
-                <div class="hourly-card precipitation">
-                    <h3>HOURLY PRECIPITATION</h3>
-                    <div class="value-display">
-                        <span id="precip-probability">--%</span>
-                        <span class="label">Chance of Rain</span>
+            <div class="hourly-forecast">
+                <h3>HOURLY FORECAST</h3>
+                <div class="forecast-grid">
+                    <div class="forecast-controls">
+                        <button id="prev-hour" class="control-btn"><i class="fas fa-chevron-left"></i></button>
+                        <span id="time-display">Now</span>
+                        <button id="next-hour" class="control-btn"><i class="fas fa-chevron-right"></i></button>
                     </div>
-                    <canvas id="precipCanvas" width="300" height="200"></canvas>
-                    <div class="time-display">
-                        <span id="precip-time">--:-- --</span>
+                    <div class="forecast-row header">
+                        <div class="col">Time</div>
+                        <div class="col">Wind</div>
+                        <div class="col">Precip</div>
+                        <div class="col">Condition</div>
                     </div>
-                    <div class="time-controls">
-                        <button id="precip-current" class="time-btn active">Current Hour</button>
-                        <button id="precip-forecast" class="time-btn">Next 8 Hours</button>
-                    </div>
-                </div>
-
-                <div class="hourly-card wind">
-                    <h3>HOURLY WIND</h3>
-                    <div class="value-display">
-                        <span id="wind-speed">-- km/h</span>
-                        <span id="wind-direction" class="direction">--</span>
-                        <span class="label">Current Wind Speed</span>
-                    </div>
-                    <canvas id="windCanvas" width="300" height="200"></canvas>
-                    <div class="time-display">
-                        <span id="wind-time">--:-- --</span>
-                    </div>
-                    <div class="time-controls">
-                        <button id="wind-current" class="time-btn active">Current Hour</button>
-                        <button id="wind-forecast" class="time-btn">Next 8 Hours</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="large-cards">
-                <div class="large-card precipitation-large-card">
-                    <div class="card-header">
-                        <i class="fas fa-cloud-rain"></i>
-                        <span>HOURLY PRECIPITATION</span>
-                    </div>
-                    <div class="card-content">
-                        <div class="current-precipitation">
-                            <div class="card-value" id="precipitation-chance-large">--%</div>
-                            <div class="card-description">Chance of Rain</div>
-                        </div>
-                        <canvas id="precipitation-canvas"></canvas>
-                        <div class="visualization-controls">
-                            <button id="prev-hour" class="control-btn"><i class="fas fa-chevron-left"></i></button>
-                            <span id="time-display">Now</span>
-                            <button id="next-hour" class="control-btn"><i class="fas fa-chevron-right"></i></button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="large-card wind-large-card">
-                    <div class="card-header">
-                        <i class="fas fa-wind"></i>
-                        <span>HOURLY WIND</span>
-                    </div>
-                    <div class="card-content">
-                        <div class="current-wind">
-                            <div class="card-value" id="wind-speed-large">-- km/h</div>
-                            <div class="card-description">Current Wind Speed</div>
-                        </div>
-                        <canvas id="wind-canvas"></canvas>
-                        <div class="visualization-controls">
-                            <div class="wind-legend">
-                                <span class="legend-item">Light</span>
-                                <span class="legend-item">Moderate</span>
-                                <span class="legend-item">Strong</span>
-                            </div>
-                        </div>
+                    <div id="forecast-rows" class="forecast-rows">
+                        <!-- Rows will be populated by JavaScript -->
                     </div>
                 </div>
             </div>
 
             <div class="detailed-cards">
-                <div class="detail-card precipitation-card">
-                    <div class="card-header">
-                        <i class="fas fa-cloud-rain"></i>
-                        <span>PRECIPITATION</span>
-                    </div>
-                    <div class="card-value" id="precipitation-chance">--%</div>
-                    <div class="card-description" id="precipitation-desc">--</div>
-                </div>
-
                 <div class="detail-card air-quality-card">
                     <div class="card-header">
                         <button class="info-btn" id="aqi-info-btn">
@@ -213,46 +147,6 @@
                     <div class="card-description">US AQI</div>
                     <div class="card-status" id="air-quality-status">--</div>
                     <div class="card-pollutants" id="air-quality-pollutants"></div>
-                </div>
-
-                <!-- Air Quality Info Modal -->
-                <div class="modal" id="aqi-info-modal">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h3>🌫️ Air Pollutant Quick Guide</h3>
-                            <button class="close-btn">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="pollutant-guide">
-                                <div class="guide-item">
-                                    <h4>PM2.5 – 🛻🔥 (combustion)</h4>
-                                    <p>Fine particles from exhaust, smoke, wildfires. Affects lungs & heart.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>PM10 – 🌾💨 (dust & pollen)</h4>
-                                    <p>Coarse particles like dust, mold, and pollen. Irritates airways.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>Ozone (O₃) – ☀️🏙️ (sun + smog)</h4>
-                                    <p>Forms in sunlight. Irritates lungs, especially during summer.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>NO₂ – 🚗💨 (traffic fumes)</h4>
-                                    <p>From car engines and power plants. Worsens asthma.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>SO₂ – 🏭⚠️ (industrial gas)</h4>
-                                    <p>Burning coal/oil. Triggers coughing and breathing trouble.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>CO – 🔥🫁 (incomplete burning)</h4>
-                                    <p>From cars, stoves, and heaters. Blocks oxygen to the body.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="detail-card uv-card">
@@ -276,6 +170,47 @@
             </div>
         </main>
     </div>
+
+    <!-- Air Quality Info Modal -->
+    <div class="modal" id="aqi-info-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🌫️ Air Pollutant Quick Guide</h3>
+                <button class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="pollutant-guide">
+                    <div class="guide-item">
+                        <h4>PM2.5 – 🛻�� (combustion)</h4>
+                        <p>Fine particles from exhaust, smoke, wildfires. Affects lungs & heart.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>PM10 – 🌾💨 (dust & pollen)</h4>
+                        <p>Coarse particles like dust, mold, and pollen. Irritates airways.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>Ozone (O₃) – ☀️🏙️ (sun + smog)</h4>
+                        <p>Forms in sunlight. Irritates lungs, especially during summer.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>NO₂ – 🚗💨 (traffic fumes)</h4>
+                        <p>From car engines and power plants. Worsens asthma.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>SO₂ – 🏭⚠️ (industrial gas)</h4>
+                        <p>Burning coal/oil. Triggers coughing and breathing trouble.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>CO – 🔥🫁 (incomplete burning)</h4>
+                        <p>From cars, stoves, and heaters. Blocks oxygen to the body.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="script.js"></script>
 </body>
 </html>

@@ -39,6 +39,8 @@ let particles = {
 };
 let precipMode = 'current'; // 'current' or 'forecast'
 let windMode = 'current';
+let userLocation = null;
+let searchedLocation = null;
 let rainParticles = [];
 let windParticles = [];
 
@@ -51,6 +53,17 @@ function setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('theme', theme);
         currentTheme = theme;
+        
+        // Update theme button state
+        const themeBtn = document.getElementById('theme-btn');
+        const themeDropdown = document.querySelector('.theme-dropdown');
+        const themeOptions = document.querySelectorAll('.theme-option');
+        
+        if (themeBtn && themeOptions) {
+            themeOptions.forEach(option => {
+                option.classList.toggle('active', option.dataset.theme === theme);
+            });
+        }
     }
 }
 
@@ -111,7 +124,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             elements.loadingElement.style.display = 'flex';
             elements.errorElement.textContent = '';
             const coordinates = await getCoordinates(location);
-            await updateWeather(coordinates.latitude, coordinates.longitude, coordinates.name);
+            await updateWeather(coordinates.latitude, coordinates.longitude, coordinates.name, false);
         } catch (error) {
             console.error('Search error:', error);
             elements.errorElement.textContent = error.message || 'Error searching location';
@@ -131,7 +144,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             elements.loadingElement.style.display = 'flex';
             elements.errorElement.textContent = '';
             const locationData = await getCurrentLocation();
-            await updateWeather(locationData.latitude, locationData.longitude, locationData.name);
+            await updateWeather(locationData.latitude, locationData.longitude, locationData.name, true);
         } catch (error) {
             console.error('Current location error:', error);
             elements.errorElement.textContent = error.message;
@@ -147,6 +160,56 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    function updateHourlyForecast() {
+        if (!currentWeatherData || !currentWeatherData.hourly) return;
+
+        const forecastRows = document.getElementById('forecast-rows');
+        if (!forecastRows) return;
+
+        // Clear existing rows
+        forecastRows.innerHTML = '';
+
+        // Get the current hour's index
+        const now = new Date();
+        const currentHour = now.getHours();
+        
+        // Create rows for the next 8 hours
+        for (let i = currentHourIndex; i < currentHourIndex + 8; i++) {
+            if (i >= currentWeatherData.hourly.time.length) break;
+
+            const time = new Date(currentWeatherData.hourly.time[i]);
+            const windSpeed = currentWeatherData.hourly.wind_speed_10m[i];
+            const precip = currentWeatherData.hourly.precipitation_probability[i];
+            const weatherCode = currentWeatherData.hourly.weather_code[i];
+
+            const row = document.createElement('div');
+            row.className = 'forecast-row';
+            
+            row.innerHTML = `
+                <div class="col time">
+                    ${i === currentHourIndex ? 'Now' : time.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        hour12: true
+                    })}
+                </div>
+                <div class="col wind">
+                    ${Math.round(convertSpeed(windSpeed, 'km/h', currentSpeedUnit))} ${currentSpeedUnit}
+                    <i class="fas fa-arrow-up" style="transform: rotate(${currentWeatherData.hourly.wind_direction_10m[i]}deg)"></i>
+                </div>
+                <div class="col precip">
+                    ${precip}%
+                    ${precip > 0 ? '<i class="fas fa-cloud-rain"></i>' : ''}
+                </div>
+                <div class="col condition">
+                    <i class="fas ${getWeatherIcon(weatherCode)}"></i>
+                    ${getWeatherDescription(weatherCode)}
+                </div>
+            `;
+
+            forecastRows.appendChild(row);
+        }
+    }
+
     function updateVisualizations() {
         if (!currentWeatherData) return;
 
@@ -156,66 +219,51 @@ document.addEventListener('DOMContentLoaded', async function() {
             animationFrameId = null;
         }
 
-        // Update precipitation visualization
-        if (elements.precipCanvas) {
-            const precipCtx = elements.precipCanvas.getContext('2d');
-            const precipParams = updatePrecipitationDisplay(
-                elements.precipCanvas,
-                currentWeatherData,
-                currentHourIndex,
-                precipMode === 'forecast'
-            );
-            
-            // Start precipitation animation if there's precipitation
-            if (precipParams.amount > 0) {
-                function animatePrecip() {
-                    animate(precipCtx, particles.rain, { intensity: precipParams.amount });
-                    animationFrameId = requestAnimationFrame(animatePrecip);
-                }
-                animatePrecip();
-            }
+        // Update hourly forecast display
+        updateHourlyForecast();
+    }
+
+    // Update time displays
+    function updateTimeDisplay() {
+        if (!currentWeatherData) return;
+
+        const now = new Date();
+        const searchedTime = new Date(currentWeatherData.hourly.time[currentHourIndex]);
+        
+        // Update current location time
+        if (elements.currentTimeElement && userLocation) {
+            elements.currentTimeElement.innerHTML = `
+                Your Location (📍): ${userLocation.name} – ${now.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                })}
+            `;
         }
 
-        // Update wind visualization
-        if (elements.windCanvas) {
-            const windCtx = elements.windCanvas.getContext('2d');
-            const windParams = updateWindDisplay(
-                elements.windCanvas,
-                currentWeatherData,
-                currentHourIndex,
-                windMode === 'forecast'
-            );
-            
-            // Start wind animation
-            function animateWind() {
-                animate(windCtx, particles.wind, { speed: windParams.speed });
-                animationFrameId = requestAnimationFrame(animateWind);
-            }
-            animateWind();
+        // Update searched location time
+        if (elements.locationElement && searchedLocation) {
+            elements.locationElement.innerHTML = `
+                ${searchedLocation.name} (🔍) – ${searchedTime.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: currentWeatherData.timezone
+                })}
+            `;
+        }
+
+        // Update current date
+        if (elements.currentDateElement) {
+            elements.currentDateElement.textContent = now.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+            });
         }
     }
 
-    // Initialize the app
-    async function init() {
-        try {
-            if (!navigator.geolocation) {
-                throw new Error('Geolocation is not supported by your browser. Please use the search bar to enter a location.');
-            }
-            
-            elements.loadingElement.style.display = 'flex';
-            elements.errorElement.textContent = '';
-            
-            const locationData = await getCurrentLocation();
-            await updateWeather(locationData.latitude, locationData.longitude, locationData.name);
-        } catch (error) {
-            console.error('Error initializing weather:', error);
-            elements.errorElement.textContent = error.message || 'Unable to get location. Please use the search bar to enter a location manually.';
-            elements.loadingElement.style.display = 'none';
-            throw error; // Re-throw to be caught by the outer try-catch
-        }
-    }
-
-    async function updateWeather(latitude, longitude, locationName) {
+    async function updateWeather(latitude, longitude, locationName, isUserLocation = false) {
         try {
             elements.loadingElement.style.display = 'flex';
             elements.errorElement.textContent = '';
@@ -228,27 +276,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                 throw new Error('Invalid weather data received from API');
             }
             
+            // Update location state
+            if (isUserLocation) {
+                userLocation = { latitude, longitude, name: locationName };
+            } else {
+                searchedLocation = { latitude, longitude, name: locationName };
+            }
+            
             currentWeatherData = data;
             console.log('Weather data updated:', data);
             
-            // Update all displays
-            elements.locationElement.textContent = locationName;
-            const temp = Math.round(convertTemperature(data.current.temperature_2m, currentUnit));
-            elements.temperatureElement.textContent = temp;
-            document.querySelector('.unit').textContent = `°${currentUnit}`;
-            
-            if (elements.feelsLikeElement) {
-                const feelsLikeTemp = Math.round(convertTemperature(data.current.apparent_temperature, currentUnit));
-                elements.feelsLikeElement.textContent = `Feels like: ${feelsLikeTemp}°`;
-            }
-            
-            elements.descriptionElement.textContent = getWeatherDescription(data.current.weather_code);
-            
-            // Update weather details if elements exist
-            if (elements.windElement) elements.windElement.textContent = `${Math.round(data.current.wind_speed_10m)} ${currentSpeedUnit}`;
-            if (elements.humidityElement) elements.humidityElement.textContent = `${Math.round(data.current.relative_humidity_2m)}%`;
-            if (elements.precipitationElement) elements.precipitationElement.textContent = `${data.current.precipitation} mm`;
-            if (elements.uvIndexElement) elements.uvIndexElement.textContent = Math.round(data.current.uv_index);
+            // Update displays
+            updateTimeDisplay();
+            updateDisplayUnits();
             
             // Initialize and update visualizations
             setupVisualizations();
@@ -305,55 +345,138 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (currentHourIndex > 0) {
                 currentHourIndex--;
                 updateVisualizations();
+                updateTimeDisplay();
             }
         });
     }
 
     if (elements.nextHourBtn) {
         elements.nextHourBtn.addEventListener('click', () => {
-            if (currentWeatherData && currentHourIndex < currentWeatherData.hourly.time.length - 1) {
+            if (currentWeatherData && currentHourIndex < currentWeatherData.hourly.time.length - 8) {
                 currentHourIndex++;
                 updateVisualizations();
+                updateTimeDisplay();
             }
         });
     }
 
-    // Update time display
-    function updateTimeDisplay() {
+    // Start time updates
+    updateTimeDisplay();
+    setInterval(updateTimeDisplay, 60000); // Update every minute
+
+    // Theme management
+    const themeBtn = document.getElementById('theme-btn');
+    const themeDropdown = document.querySelector('.theme-dropdown');
+    const themeOptions = document.querySelectorAll('.theme-option');
+    
+    if (themeBtn && themeDropdown) {
+        // Theme button click handler
+        themeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            themeDropdown.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.theme-selector')) {
+                themeDropdown.classList.remove('show');
+            }
+        });
+
+        // Theme option selection
+        themeOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const theme = option.dataset.theme;
+                setTheme(theme);
+                themeDropdown.classList.remove('show');
+            });
+        });
+    }
+
+    // Unit conversion functions
+    function convertTemp(value, fromUnit, toUnit) {
+        if (fromUnit === toUnit) return value;
+        if (fromUnit === 'C' && toUnit === 'F') {
+            return (value * 9/5) + 32;
+        }
+        return (value - 32) * 5/9; // F to C
+    }
+
+    function convertSpeed(value, fromUnit, toUnit) {
+        if (fromUnit === toUnit) return value;
+        if (fromUnit === 'km/h' && toUnit === 'mph') {
+            return value / 1.609;
+        }
+        return value * 1.609; // mph to km/h
+    }
+
+    // Update displays with unit conversion
+    function updateDisplayUnits() {
         if (!currentWeatherData) return;
-        
-        const currentTime = new Date(currentWeatherData.hourly.time[currentHourIndex]);
-        if (elements.timeDisplay) {
-            elements.timeDisplay.textContent = currentTime.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
+
+        // Update temperature displays
+        const temp = convertTemp(
+            currentWeatherData.current.temperature_2m,
+            'C',
+            currentUnit
+        );
+        elements.temperatureElement.textContent = Math.round(temp);
+        document.querySelector('.unit').textContent = `°${currentUnit}`;
+
+        if (elements.feelsLikeElement) {
+            const feelsLike = convertTemp(
+                currentWeatherData.current.apparent_temperature,
+                'C',
+                currentUnit
+            );
+            elements.feelsLikeElement.textContent = `Feels like: ${Math.round(feelsLike)}°`;
         }
+
+        // Update wind speed displays
+        if (elements.windElement) {
+            const windSpeed = convertSpeed(
+                currentWeatherData.current.wind_speed_10m,
+                'km/h',
+                currentSpeedUnit
+            );
+            elements.windElement.textContent = `${Math.round(windSpeed)} ${currentSpeedUnit}`;
+        }
+
+        // Update unit button states
+        document.querySelectorAll('.unit-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.unit === currentUnit);
+        });
+
+        document.querySelectorAll('.speed-unit-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.speedUnit === currentSpeedUnit);
+        });
+
+        // Update visualizations with new units
+        updateVisualizations();
     }
 
-    // Update current date/time
-    function updateDateTime() {
-        const now = new Date();
-        if (elements.currentTimeElement) {
-            elements.currentTimeElement.textContent = now.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
-        }
-        if (elements.currentDateElement) {
-            elements.currentDateElement.textContent = now.toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric'
-            });
-        }
-    }
+    // Unit toggle event handlers
+    document.querySelectorAll('.unit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const newUnit = btn.dataset.unit;
+            if (newUnit !== currentUnit) {
+                currentUnit = newUnit;
+                localStorage.setItem('unit', newUnit);
+                updateDisplayUnits();
+            }
+        });
+    });
 
-    // Start date/time updates
-    updateDateTime();
-    setInterval(updateDateTime, 60000); // Update every minute
+    document.querySelectorAll('.speed-unit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const newUnit = btn.dataset.speedUnit;
+            if (newUnit !== currentSpeedUnit) {
+                currentSpeedUnit = newUnit;
+                localStorage.setItem('speedUnit', newUnit);
+                updateDisplayUnits();
+            }
+        });
+    });
 
     // Initialize the app (only once)
     try {

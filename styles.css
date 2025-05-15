@@ -470,101 +470,143 @@ button:hover {
 }
 
 .hourly-forecast {
-    background-color: var(--secondary-bg);
-    padding: 2rem;
-    border-radius: 12px;
+    background: var(--card-bg);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: var(--card-shadow);
 }
 
-.hourly-forecast h2 {
-    margin-bottom: 1.5rem;
-    color: var(--text-secondary);
-    font-size: 1.2rem;
+.hourly-forecast h3 {
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    text-align: center;
 }
 
-.forecast-container {
-    display: flex;
-    overflow-x: auto;
-    gap: 2rem;
-    padding-bottom: 1rem;
-    scrollbar-width: thin;
-    scrollbar-color: var(--accent) var(--secondary-bg);
-}
-
-.forecast-container::-webkit-scrollbar {
-    height: 6px;
-}
-
-.forecast-container::-webkit-scrollbar-track {
-    background: var(--secondary-bg);
-    border-radius: 3px;
-}
-
-.forecast-container::-webkit-scrollbar-thumb {
-    background-color: var(--accent);
-    border-radius: 3px;
-}
-
-.forecast-item {
+.forecast-grid {
     display: flex;
     flex-direction: column;
+    gap: 10px;
+}
+
+.forecast-controls {
+    display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 0.5rem;
-    min-width: 120px;
-    padding: 1rem;
-    background-color: rgba(255, 255, 255, 0.05);
+    gap: 20px;
+    margin-bottom: 15px;
+}
+
+.control-btn {
+    background: var(--button-bg);
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: background-color 0.3s;
+}
+
+.control-btn:hover {
+    background: var(--button-hover);
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.forecast-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 12px;
     border-radius: 8px;
-    transition: transform 0.2s;
+    background: var(--card-hover);
+    align-items: center;
 }
 
-.forecast-item:hover {
-    transform: translateY(-2px);
-}
-
-.forecast-item .time {
+.forecast-row.header {
+    background: none;
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-weight: 600;
+    font-size: 0.9em;
+    text-transform: uppercase;
+}
+
+.forecast-row .col {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.forecast-row .col i {
+    font-size: 1.1em;
+    color: var(--accent-color);
+}
+
+.forecast-row .time {
     font-weight: 500;
 }
 
-.forecast-item .temp {
-    font-size: 1.2rem;
-    font-weight: 600;
+.forecast-row .wind i {
+    transition: transform 0.3s ease;
 }
 
-.forecast-item .wind-info {
-    font-size: 0.9rem;
+.forecast-row .precip {
     color: var(--text-primary);
 }
 
-.forecast-item .wind-gusts {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+.forecast-row .precip i {
+    color: var(--accent-blue);
 }
 
-.forecast-item .precipitation {
-    font-size: 0.9rem;
-    color: var(--accent);
+.forecast-row .condition {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 8px;
 }
 
-.forecast-item .precipitation::before {
-    content: '💧';
-    font-size: 0.8rem;
+.forecast-row .condition i {
+    font-size: 1.2em;
 }
 
+/* Responsive adjustments */
 @media (max-width: 768px) {
-    .container {
-        padding: 1rem;
+    .forecast-row {
+        font-size: 0.9em;
+        padding: 10px;
     }
-    
-    .temperature-container {
-        font-size: 3rem;
+
+    .forecast-row .condition {
+        font-size: 0.85em;
     }
-    
-    .weather-details {
-        grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 480px) {
+    .forecast-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .forecast-row.header {
+        display: none;
+    }
+
+    .forecast-row .col {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .forecast-row .col::before {
+        content: attr(data-label);
+        font-size: 0.8em;
+        color: var(--text-secondary);
+        text-transform: uppercase;
     }
 }
 
