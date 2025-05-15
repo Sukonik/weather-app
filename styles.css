@@ -63,6 +63,38 @@
     --accent-blue: #00b894;
 }
 
+:root[data-theme="sunset"] {
+    --primary-bg: #2c1810;
+    --secondary-bg: #3d2317;
+    --text-primary: #ffd6b6;
+    --text-secondary: #ffb088;
+    --accent: #ff7e5f;
+    --accent-rgb: 255, 126, 95;
+    --hover-bg: rgba(255, 126, 95, 0.1);
+    --card-bg: #3d2317;
+    --card-hover: #4d2d1d;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --button-bg: #4d2d1d;
+    --button-hover: #5d3723;
+    --accent-blue: #ff7e5f;
+}
+
+:root[data-theme="boba-tea"] {
+    --primary-bg: #f3e9dc;
+    --secondary-bg: #e6d5c3;
+    --text-primary: #4a3728;
+    --text-secondary: #7d5b42;
+    --accent: #b08968;
+    --accent-rgb: 176, 137, 104;
+    --hover-bg: rgba(176, 137, 104, 0.1);
+    --card-bg: #e6d5c3;
+    --card-hover: #dac7b2;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --button-bg: #dac7b2;
+    --button-hover: #ceb8a1;
+    --accent-blue: #b08968;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -238,14 +270,19 @@ header {
     background-color: var(--secondary-bg);
     border-radius: 8px;
     padding: 0.5rem;
-    display: none;
+    opacity: 0;
+    visibility: hidden;
     z-index: 1000;
     min-width: 150px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
 }
 
-.theme-dropdown.active {
-    display: block;
+.theme-dropdown.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
 }
 
 .theme-option {
