@@ -64,6 +64,11 @@ function setTheme(theme) {
                 option.classList.toggle('active', option.dataset.theme === theme);
             });
         }
+
+        // Update visualizations with new theme colors
+        if (currentWeatherData) {
+            updateVisualizations();
+        }
     }
 }
 
@@ -219,6 +224,44 @@ document.addEventListener('DOMContentLoaded', async function() {
             animationFrameId = null;
         }
 
+        // Update precipitation visualization
+        if (elements.precipCanvas) {
+            const precipCtx = elements.precipCanvas.getContext('2d');
+            const precipParams = updatePrecipitationDisplay(
+                elements.precipCanvas,
+                currentWeatherData,
+                currentHourIndex,
+                precipMode === 'forecast'
+            );
+            
+            // Start precipitation animation if there's precipitation
+            if (precipParams.amount > 0) {
+                function animatePrecip() {
+                    animate(precipCtx, particles.rain, { intensity: precipParams.amount });
+                    animationFrameId = requestAnimationFrame(animatePrecip);
+                }
+                animatePrecip();
+            }
+        }
+
+        // Update wind visualization
+        if (elements.windCanvas) {
+            const windCtx = elements.windCanvas.getContext('2d');
+            const windParams = updateWindDisplay(
+                elements.windCanvas,
+                currentWeatherData,
+                currentHourIndex,
+                windMode === 'forecast'
+            );
+            
+            // Start wind animation
+            function animateWind() {
+                animate(windCtx, particles.wind, { speed: windParams.speed });
+                animationFrameId = requestAnimationFrame(animateWind);
+            }
+            animateWind();
+        }
+
         // Update hourly forecast display
         updateHourlyForecast();
     }
@@ -370,20 +413,17 @@ document.addEventListener('DOMContentLoaded', async function() {
     const themeOptions = document.querySelectorAll('.theme-option');
     
     if (themeBtn && themeDropdown) {
-        // Theme button click handler
         themeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             themeDropdown.classList.toggle('show');
         });
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.theme-selector')) {
                 themeDropdown.classList.remove('show');
             }
         });
 
-        // Theme option selection
         themeOptions.forEach(option => {
             option.addEventListener('click', () => {
                 const theme = option.dataset.theme;

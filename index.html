@@ -114,6 +114,41 @@
                 </div>
             </div>
 
+            <div class="hourly-section">
+                <div class="hourly-card precipitation">
+                    <h3>HOURLY PRECIPITATION</h3>
+                    <div class="value-display">
+                        <span id="precip-probability">--%</span>
+                        <span class="label">Chance of Rain</span>
+                    </div>
+                    <canvas id="precipCanvas" width="300" height="200"></canvas>
+                    <div class="time-display">
+                        <span id="precip-time">--:-- --</span>
+                    </div>
+                    <div class="time-controls">
+                        <button id="precip-current" class="time-btn active">Current Hour</button>
+                        <button id="precip-forecast" class="time-btn">Next 8 Hours</button>
+                    </div>
+                </div>
+
+                <div class="hourly-card wind">
+                    <h3>HOURLY WIND</h3>
+                    <div class="value-display">
+                        <span id="wind-speed">-- km/h</span>
+                        <span id="wind-direction" class="direction">--</span>
+                        <span class="label">Current Wind Speed</span>
+                    </div>
+                    <canvas id="windCanvas" width="300" height="200"></canvas>
+                    <div class="time-display">
+                        <span id="wind-time">--:-- --</span>
+                    </div>
+                    <div class="time-controls">
+                        <button id="wind-current" class="time-btn active">Current Hour</button>
+                        <button id="wind-forecast" class="time-btn">Next 8 Hours</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="hourly-forecast">
                 <h3>HOURLY FORECAST</h3>
                 <div class="forecast-grid">
