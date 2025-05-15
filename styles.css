@@ -275,17 +275,71 @@ header {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    align-items: flex-end;
 }
 
 .current-time {
-    font-size: 1.5rem;
-    font-weight: 600;
+    font-size: 1.75rem;
+    font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.5px;
 }
 
 .current-date {
     color: var(--text-secondary);
     font-size: 1rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.location {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    letter-spacing: -1px;
+    line-height: 1.2;
+}
+
+.temperature-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.temperature {
+    font-size: 4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+    letter-spacing: -2px;
+}
+
+.unit {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+}
+
+.weather-description {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.condition {
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.feels-like {
+    font-size: 1rem;
+    opacity: 0.8;
 }
 
 .unit-toggle {
@@ -420,63 +474,171 @@ button:hover {
     border-radius: 12px;
 }
 
-.location {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-}
-
-.temperature-container {
-    font-size: 4rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-    cursor: pointer;
-    transition: opacity 0.2s;
-}
-
-.temperature-container:hover {
-    opacity: 0.9;
-}
-
-.weather-description {
-    font-size: 1.2rem;
-    color: var(--text-secondary);
-}
-
 .weather-details {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 3rem;
+    gap: 1.5rem;
+    margin: 2rem 0;
 }
 
 .detail-item {
-    background-color: var(--secondary-bg);
+    background: var(--card-bg);
+    border-radius: 1rem;
     padding: 1.5rem;
-    border-radius: 12px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    transition: transform 0.2s;
+    gap: 0.75rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .detail-item:hover {
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .detail-item i {
     font-size: 1.5rem;
-    color: var(--accent);
+    color: var(--accent-color);
 }
 
 .detail-item .label {
+    font-size: 0.875rem;
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-item .value-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .detail-item .value {
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     font-weight: 600;
+    color: var(--text-primary);
+}
+
+.detail-item .description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.detail-item .tooltip {
+    display: none;
+    position: absolute;
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    z-index: 10;
+    max-width: 200px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.detail-item:hover .tooltip {
+    display: block;
+}
+
+.aqi-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.aqi-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.aqi-item .label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.aqi-item .value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.hourly-forecast {
+    background: var(--card-bg);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin: 2rem 0;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.hour-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.hour-btn {
+    background: var(--button-bg);
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.hour-btn:hover {
+    background: var(--button-hover-bg);
+}
+
+.forecast-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.forecast-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 2fr;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: var(--card-bg);
+    align-items: center;
+}
+
+.forecast-row:hover {
+    background: var(--card-hover-bg);
+}
+
+.forecast-row .col {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.forecast-row .time {
+    font-weight: 500;
+}
+
+.forecast-row i {
+    color: var(--accent-color);
 }
 
 /* New wind styles */
@@ -505,12 +667,6 @@ button:hover {
     color: var(--text-primary);
     margin-bottom: 20px;
     text-align: center;
-}
-
-.forecast-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
 }
 
 .forecast-controls {
@@ -542,42 +698,6 @@ button:hover {
 .control-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.forecast-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    padding: 12px;
-    border-radius: 8px;
-    background: var(--card-hover);
-    align-items: center;
-}
-
-.forecast-row.header {
-    background: none;
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.9em;
-    text-transform: uppercase;
-}
-
-.forecast-row .col {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.forecast-row .col i {
-    font-size: 1.1em;
-    color: var(--accent-color);
-}
-
-.forecast-row .time {
-    font-weight: 500;
-}
-
-.forecast-row .wind i {
-    transition: transform 0.3s ease;
 }
 
 .forecast-row .precip {
@@ -1244,9 +1364,6 @@ button,
     background-color: var(--card-bg);
     border-radius: 16px;
     padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
     box-shadow: var(--card-shadow);
     transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -1261,45 +1378,14 @@ button,
     font-size: 0.9rem;
     font-weight: 600;
     letter-spacing: 1px;
-    margin: 0;
+    margin-bottom: 1.5rem;
     text-transform: uppercase;
-}
-
-.value-display {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.value-display span {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.value-display .direction {
-    font-size: 1.2rem;
-    color: var(--accent);
-}
-
-.value-display .label {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    font-weight: normal;
-}
-
-.time-display {
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 1.1rem;
-    font-weight: 500;
 }
 
 .time-controls {
     display: flex;
     gap: 1rem;
-    margin-top: 1rem;
+    margin-top: 1.5rem;
 }
 
 .time-btn {
@@ -1310,6 +1396,7 @@ button,
     background-color: var(--button-bg);
     color: var(--text-primary);
     font-size: 0.9rem;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
 }

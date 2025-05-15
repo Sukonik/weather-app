@@ -109,7 +109,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         humidityElement: document.getElementById('humidity'),
         precipitationElement: document.getElementById('precipitation'),
         uvIndexElement: document.getElementById('uv-index'),
-        feelsLikeElement: document.querySelector('.feels-like')
+        feelsLikeElement: document.querySelector('.feels-like'),
+        visibilityElement: document.getElementById('visibility'),
+        airQualityElement: document.getElementById('air-quality')
     };
 
     // Verify required elements exist
@@ -271,38 +273,90 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!currentWeatherData) return;
 
         const now = new Date();
-        const searchedTime = new Date(currentWeatherData.hourly.time[currentHourIndex]);
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const searchedTimezone = currentWeatherData.timezone || userTimezone;
         
         // Update current location time
         if (elements.currentTimeElement && userLocation) {
-            elements.currentTimeElement.innerHTML = `
-                Your Location (📍): ${userLocation.name} – ${now.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true
-                })}
-            `;
+            const userTime = now.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+                timeZone: userTimezone
+            });
+            elements.currentTimeElement.textContent = `${userLocation.name} · ${userTime}`;
         }
 
         // Update searched location time
         if (elements.locationElement && searchedLocation) {
-            elements.locationElement.innerHTML = `
-                ${searchedLocation.name} (🔍) – ${searchedTime.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                    timeZone: currentWeatherData.timezone
-                })}
-            `;
+            const searchedTime = now.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+                timeZone: searchedTimezone
+            });
+            elements.locationElement.textContent = `${searchedLocation.name} · ${searchedTime}`;
         }
 
         // Update current date
         if (elements.currentDateElement) {
-            elements.currentDateElement.textContent = now.toLocaleDateString('en-US', {
+            const date = now.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
-                day: 'numeric'
+                day: 'numeric',
+                timeZone: searchedTimezone
             });
+            elements.currentDateElement.textContent = date;
+        }
+    }
+
+    function updateWeatherDetails() {
+        if (!currentWeatherData || !currentWeatherData.current) return;
+
+        // Update UV Index with description
+        if (elements.uvIndexElement) {
+            const uvi = currentWeatherData.current.uv_index;
+            const uviInfo = getUVIndexDescription(uvi);
+            elements.uvIndexElement.innerHTML = `
+                <span class="value">${Math.round(uvi)}</span>
+                <span class="description">${uviInfo.level}</span>
+                <span class="tooltip">${uviInfo.description}</span>
+            `;
+        }
+
+        // Update visibility with description
+        if (elements.visibilityElement) {
+            const visibility = currentWeatherData.current.visibility;
+            const visInfo = getVisibilityDescription(visibility);
+            elements.visibilityElement.innerHTML = `
+                <span class="value">${Math.round(visibility)} km</span>
+                <span class="description">${visInfo.level}</span>
+                <span class="tooltip">${visInfo.description}</span>
+            `;
+        }
+
+        // Update air quality with description
+        if (elements.airQualityElement && currentWeatherData.air_quality) {
+            const aqi = currentWeatherData.air_quality.us_epa_index;
+            const aqiInfo = getAirQualityDescription(aqi);
+            elements.airQualityElement.innerHTML = `
+                <span class="value">${aqiInfo.level}</span>
+                <span class="description">${aqiInfo.description}</span>
+                <div class="aqi-details">
+                    <div class="aqi-item">
+                        <span class="label">PM2.5</span>
+                        <span class="value">${Math.round(currentWeatherData.air_quality.pm2_5)} µg/m³</span>
+                    </div>
+                    <div class="aqi-item">
+                        <span class="label">PM10</span>
+                        <span class="value">${Math.round(currentWeatherData.air_quality.pm10)} µg/m³</span>
+                    </div>
+                    <div class="aqi-item">
+                        <span class="label">O₃</span>
+                        <span class="value">${Math.round(currentWeatherData.air_quality.o3)} µg/m³</span>
+                    </div>
+                </div>
+            `;
         }
     }
 
@@ -332,6 +386,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Update displays
             updateTimeDisplay();
             updateDisplayUnits();
+            updateWeatherDetails();
             
             // Initialize and update visualizations
             setupVisualizations();
@@ -526,3 +581,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Error already displayed by init() or updateWeather()
     }
 });
+
+async function init() {
+    try {
+        elements.loadingElement.style.display = 'flex';
+        elements.errorElement.textContent = '';
+
+        // Try to get user's current location first
+        const locationData = await getCurrentLocation();
+        await updateWeather(locationData.latitude, locationData.longitude, locationData.name, true);
+
+        // Initialize visualizations
+        setupVisualizations();
+        
+        // Start time updates
+        updateTimeDisplay();
+        setInterval(updateTimeDisplay, 60000); // Update every minute
+
+        elements.loadingElement.style.display = 'none';
+    } catch (error) {
+        console.error('Initialization error:', error);
+        elements.errorElement.textContent = 'Unable to get your location. Please search for a location.';
+        elements.loadingElement.style.display = 'none';
+    }
+}

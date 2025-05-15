@@ -50,8 +50,8 @@
                         </div>
                     </div>
                     <div class="current-datetime">
-                        <span class="current-time">--:-- --</span>
-                        <span class="current-date">---, --- --</span>
+                        <span class="current-time"></span>
+                        <span class="current-date"></span>
                     </div>
                 </div>
                 <div class="unit-toggle">
@@ -80,7 +80,7 @@
 
         <main>
             <div class="current-weather">
-                <h1 class="location">Loading...</h1>
+                <h1 class="location"></h1>
                 <div class="temperature-container">
                     <span class="temperature">--</span>
                     <span class="unit">°C</span>
@@ -110,7 +110,17 @@
                 <div class="detail-item">
                     <i class="fas fa-sun"></i>
                     <span class="label">UV Index</span>
-                    <span class="value" id="uv-index">--</span>
+                    <div class="value-container" id="uv-index">--</div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-eye"></i>
+                    <span class="label">Visibility</span>
+                    <div class="value-container" id="visibility">--</div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-lungs"></i>
+                    <span class="label">Air Quality</span>
+                    <div class="value-container" id="air-quality">--</div>
                 </div>
             </div>
 
@@ -150,23 +160,14 @@
             </div>
 
             <div class="hourly-forecast">
-                <h3>HOURLY FORECAST</h3>
-                <div class="forecast-grid">
-                    <div class="forecast-controls">
-                        <button id="prev-hour" class="control-btn"><i class="fas fa-chevron-left"></i></button>
-                        <span id="time-display">Now</span>
-                        <button id="next-hour" class="control-btn"><i class="fas fa-chevron-right"></i></button>
-                    </div>
-                    <div class="forecast-row header">
-                        <div class="col">Time</div>
-                        <div class="col">Wind</div>
-                        <div class="col">Precip</div>
-                        <div class="col">Condition</div>
-                    </div>
-                    <div id="forecast-rows" class="forecast-rows">
-                        <!-- Rows will be populated by JavaScript -->
+                <div class="section-header">
+                    <h2>Hourly Forecast</h2>
+                    <div class="hour-controls">
+                        <button id="prev-hour" class="hour-btn"><i class="fas fa-chevron-left"></i></button>
+                        <button id="next-hour" class="hour-btn"><i class="fas fa-chevron-right"></i></button>
                     </div>
                 </div>
+                <div id="forecast-rows" class="forecast-grid"></div>
             </div>
 
             <div class="detailed-cards">

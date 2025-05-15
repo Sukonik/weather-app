@@ -1,3 +1,7 @@
+// API Keys (replace with your own)
+const OPENWEATHER_API_KEY = 'YOUR_OPENWEATHER_API_KEY';
+const WEATHERAPI_KEY = 'YOUR_WEATHERAPI_KEY';
+
 // API request options
 const API_OPTIONS = {
     mode: 'cors',
@@ -15,43 +19,76 @@ export async function getWeatherData(latitude, longitude, locationName) {
     try {
         debug('Fetching weather data for:', { latitude, longitude, locationName });
         
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&daily=precipitation_probability_max,precipitation_sum&timezone=auto`;
-        const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,european_aqi,us_aqi,european_aqi_pm2_5,european_aqi_pm10,european_aqi_no2,european_aqi_o3,european_aqi_so2`;
+        // OpenWeatherMap API calls
+        const weatherUrl = `https://api.openweathermap.org/data/3.0/onecall?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric&exclude=minutely`;
+        const timeZoneUrl = `https://api.openweathermap.org/data/3.0/timezone?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}`;
+        
+        // WeatherAPI.com call for air quality
+        const airQualityUrl = `https://api.weatherapi.com/v1/current.json?key=${WEATHERAPI_KEY}&q=${latitude},${longitude}&aqi=yes`;
 
-        debug('Making API requests to:', { weatherUrl, airQualityUrl });
+        debug('Making API requests to:', { weatherUrl, timeZoneUrl, airQualityUrl });
 
         try {
-            const weatherResponse = await fetch(weatherUrl, API_OPTIONS);
-            debug('Weather API response status:', weatherResponse.status);
+            const [weatherResponse, timeZoneResponse, airQualityResponse] = await Promise.all([
+                fetch(weatherUrl, API_OPTIONS),
+                fetch(timeZoneUrl, API_OPTIONS),
+                fetch(airQualityUrl, API_OPTIONS)
+            ]);
+
+            debug('API responses:', {
+                weather: weatherResponse.status,
+                timeZone: timeZoneResponse.status,
+                airQuality: airQualityResponse.status
+            });
 
             if (!weatherResponse.ok) {
-                const errorText = await weatherResponse.text();
-                console.error('Weather API error response:', errorText);
-                throw new Error(`Weather data not available: ${weatherResponse.status} ${weatherResponse.statusText}`);
+                throw new Error(`Weather data not available: ${weatherResponse.status}`);
             }
 
-            const weatherData = await weatherResponse.json();
-            debug('Weather API response:', weatherData);
+            const [weatherData, timeZoneData, airQualityData] = await Promise.all([
+                weatherResponse.json(),
+                timeZoneResponse.json(),
+                airQualityResponse.json()
+            ]);
 
-            const airQualityResponse = await fetch(airQualityUrl, API_OPTIONS);
-            debug('Air Quality API response status:', airQualityResponse.status);
+            debug('API data:', { weatherData, timeZoneData, airQualityData });
 
-            let airQualityData = { current: {} };
-            if (airQualityResponse.ok) {
-                airQualityData = await airQualityResponse.json();
-                debug('Air Quality API response:', airQualityData);
-            } else {
-                console.warn('Air Quality API error:', airQualityResponse.status, airQualityResponse.statusText);
-            }
-
-            if (!weatherData.current || !weatherData.hourly) {
-                console.error('Invalid weather data format:', weatherData);
-                throw new Error('Invalid weather data format received from API');
-            }
-
+            // Format the data
             const result = {
-                ...weatherData,
-                air_quality: airQualityData,
+                current: {
+                    temperature_2m: weatherData.current.temp,
+                    apparent_temperature: weatherData.current.feels_like,
+                    precipitation: weatherData.current.rain ? weatherData.current.rain['1h'] : 0,
+                    weather_code: weatherData.current.weather[0].id,
+                    wind_speed_10m: weatherData.current.wind_speed,
+                    wind_direction_10m: weatherData.current.wind_deg,
+                    wind_gusts_10m: weatherData.current.wind_gust,
+                    relative_humidity_2m: weatherData.current.humidity,
+                    uv_index: weatherData.current.uvi,
+                    visibility: weatherData.current.visibility / 1000, // Convert to km
+                },
+                hourly: {
+                    time: weatherData.hourly.map(h => h.dt * 1000), // Convert to milliseconds
+                    temperature_2m: weatherData.hourly.map(h => h.temp),
+                    precipitation_probability: weatherData.hourly.map(h => h.pop * 100),
+                    precipitation: weatherData.hourly.map(h => h.rain ? h.rain['1h'] : 0),
+                    weather_code: weatherData.hourly.map(h => h.weather[0].id),
+                    wind_speed_10m: weatherData.hourly.map(h => h.wind_speed),
+                    wind_direction_10m: weatherData.hourly.map(h => h.wind_deg),
+                    wind_gusts_10m: weatherData.hourly.map(h => h.wind_gust),
+                    uv_index: weatherData.hourly.map(h => h.uvi),
+                    visibility: weatherData.hourly.map(h => h.visibility / 1000)
+                },
+                air_quality: {
+                    pm2_5: airQualityData.current.air_quality.pm2_5,
+                    pm10: airQualityData.current.air_quality.pm10,
+                    o3: airQualityData.current.air_quality.o3,
+                    no2: airQualityData.current.air_quality.no2,
+                    so2: airQualityData.current.air_quality.so2,
+                    co: airQualityData.current.air_quality.co,
+                    us_epa_index: airQualityData.current.air_quality['us-epa-index']
+                },
+                timezone: timeZoneData.timezone,
                 location_name: locationName
             };
 
