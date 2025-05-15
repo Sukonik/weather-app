@@ -1,4 +1,4 @@
-import { getWeatherData, getCoordinates, getCurrentLocation } from './js/modules/weatherAPI.js';
+import { getWeatherData, getCoordinates, getCurrentLocation } from '/weather-app/js/modules/weatherAPI.js';
 import { 
     convertTemperature, 
     getWeatherDescription, 
@@ -11,8 +11,8 @@ import {
     getWindDirection,
     formatSpeed,
     getPrecipitationIntensity
-} from './js/modules/utils.js';
-import { updateHourlyVisualizations, initializeAnimations, updatePrecipitationDisplay, updateWindDisplay, animate } from './js/modules/visualization.js';
+} from '/weather-app/js/modules/utils.js';
+import { updateHourlyVisualizations, initializeAnimations, updatePrecipitationDisplay, updateWindDisplay, animate } from '/weather-app/js/modules/visualization.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements (fixed selectors)
