@@ -1,17 +1,28 @@
+// API request options
+const API_OPTIONS = {
+    mode: 'cors',
+    headers: {
+        'Accept': 'application/json'
+    }
+};
+
+// Debug logging function
+const debug = (message, data) => {
+    console.log(`[WeatherAPI] ${message}`, data);
+};
+
 export async function getWeatherData(latitude, longitude, locationName) {
     try {
-        console.log('Fetching weather data for:', { latitude, longitude, locationName });
+        debug('Fetching weather data for:', { latitude, longitude, locationName });
         
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility,precipitation_intensity,wind_speed_80m,wind_speed_120m&daily=precipitation_probability_max,precipitation_sum&timezone=auto`;
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&daily=precipitation_probability_max,precipitation_sum&timezone=auto`;
         const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,european_aqi,us_aqi,european_aqi_pm2_5,european_aqi_pm10,european_aqi_no2,european_aqi_o3,european_aqi_so2`;
 
-        console.log('Making API requests to:', { weatherUrl, airQualityUrl });
+        debug('Making API requests to:', { weatherUrl, airQualityUrl });
 
         try {
-            const [weatherResponse, airQualityResponse] = await Promise.all([
-                fetch(weatherUrl),
-                fetch(airQualityUrl)
-            ]);
+            const weatherResponse = await fetch(weatherUrl, API_OPTIONS);
+            debug('Weather API response status:', weatherResponse.status);
 
             if (!weatherResponse.ok) {
                 const errorText = await weatherResponse.text();
@@ -20,12 +31,15 @@ export async function getWeatherData(latitude, longitude, locationName) {
             }
 
             const weatherData = await weatherResponse.json();
-            console.log('Weather API response:', weatherData);
+            debug('Weather API response:', weatherData);
+
+            const airQualityResponse = await fetch(airQualityUrl, API_OPTIONS);
+            debug('Air Quality API response status:', airQualityResponse.status);
 
             let airQualityData = { current: {} };
             if (airQualityResponse.ok) {
                 airQualityData = await airQualityResponse.json();
-                console.log('Air Quality API response:', airQualityData);
+                debug('Air Quality API response:', airQualityData);
             } else {
                 console.warn('Air Quality API error:', airQualityResponse.status, airQualityResponse.statusText);
             }
@@ -41,7 +55,7 @@ export async function getWeatherData(latitude, longitude, locationName) {
                 location_name: locationName
             };
 
-            console.log('Final weather data:', result);
+            debug('Final weather data:', result);
             return result;
         } catch (fetchError) {
             console.error('API fetch error:', fetchError);
@@ -105,48 +119,56 @@ export async function getCurrentLocation() {
     }
 
     try {
-        console.log('Getting current location...');
+        debug('Getting current location...');
         const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
-                timeout: 5000,
+                timeout: 10000,
                 maximumAge: 0
             });
         });
 
         const { latitude, longitude } = position.coords;
-        console.log('Got coordinates:', { latitude, longitude });
+        debug('Got coordinates:', { latitude, longitude });
+
+        // Default to coordinates if reverse geocoding fails
+        const defaultResult = {
+            latitude,
+            longitude,
+            name: 'Current Location'
+        };
         
         try {
             const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}`;
-            console.log('Reverse geocoding URL:', url);
+            debug('Reverse geocoding URL:', url);
             
-            const response = await fetch(url);
+            const response = await fetch(url, API_OPTIONS);
+            debug('Reverse geocoding response status:', response.status);
             
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('Reverse geocoding error:', errorText);
-                throw new Error('Reverse geocoding failed');
+                return defaultResult;
             }
             
             const data = await response.json();
-            console.log('Reverse geocoding response:', data);
+            debug('Reverse geocoding response:', data);
+
+            if (!data.results || !data.results.length) {
+                return defaultResult;
+            }
 
             const result = {
                 latitude,
                 longitude,
-                name: data?.results?.[0]?.name || 'Current Location'
+                name: data.results[0].name
             };
             
-            console.log('Final location data:', result);
+            debug('Final location data:', result);
             return result;
         } catch (error) {
             console.warn('Reverse geocoding failed, using fallback:', error);
-            return {
-                latitude,
-                longitude,
-                name: 'Current Location'
-            };
+            return defaultResult;
         }
     } catch (error) {
         console.error('Geolocation error:', error);
