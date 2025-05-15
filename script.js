@@ -625,8 +625,15 @@ try {
                 if (loadingElement) loadingElement.style.display = 'flex';
                 if (errorElement) errorElement.textContent = '';
                 
+                console.log('Updating weather for:', { latitude, longitude, locationName });
                 const data = await getWeatherData(latitude, longitude, locationName);
+                
+                if (!data || !data.current) {
+                    throw new Error('Invalid weather data received');
+                }
+                
                 currentWeatherData = data;
+                console.log('Weather data updated:', data);
                 
                 // Update all displays
                 locationElement.textContent = locationName;
@@ -654,9 +661,9 @@ try {
             } catch (error) {
                 console.error('Error updating weather:', error);
                 if (errorElement) {
-                    errorElement.textContent = 'Unable to fetch weather data. Please try again.';
-                    if (loadingElement) loadingElement.style.display = 'none';
+                    errorElement.textContent = error.message || 'Unable to fetch weather data. Please try again.';
                 }
+                if (loadingElement) loadingElement.style.display = 'none';
             }
         }
 
