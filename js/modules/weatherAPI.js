@@ -1,6 +1,6 @@
 // API Keys (replace with your own)
-const OPENWEATHER_API_KEY = 'YOUR_OPENWEATHER_API_KEY';
-const WEATHERAPI_KEY = 'YOUR_WEATHERAPI_KEY';
+const WAQI_TOKEN = 'YOUR_WAQI_TOKEN';
+const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY';
 
 // API request options
 const API_OPTIONS = {
@@ -19,25 +19,22 @@ export async function getWeatherData(latitude, longitude, locationName) {
     try {
         debug('Fetching weather data for:', { latitude, longitude, locationName });
         
-        // OpenWeatherMap API calls
-        const weatherUrl = `https://api.openweathermap.org/data/3.0/onecall?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric&exclude=minutely`;
-        const timeZoneUrl = `https://api.openweathermap.org/data/3.0/timezone?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}`;
+        // Open-Meteo API calls
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&timezone=auto`;
         
-        // WeatherAPI.com call for air quality
-        const airQualityUrl = `https://api.weatherapi.com/v1/current.json?key=${WEATHERAPI_KEY}&q=${latitude},${longitude}&aqi=yes`;
+        // WAQI API call for air quality
+        const airQualityUrl = `https://api.waqi.info/feed/geo:${latitude};${longitude}/?token=${WAQI_TOKEN}`;
 
-        debug('Making API requests to:', { weatherUrl, timeZoneUrl, airQualityUrl });
+        debug('Making API requests to:', { weatherUrl, airQualityUrl });
 
         try {
-            const [weatherResponse, timeZoneResponse, airQualityResponse] = await Promise.all([
+            const [weatherResponse, airQualityResponse] = await Promise.all([
                 fetch(weatherUrl, API_OPTIONS),
-                fetch(timeZoneUrl, API_OPTIONS),
                 fetch(airQualityUrl, API_OPTIONS)
             ]);
 
             debug('API responses:', {
                 weather: weatherResponse.status,
-                timeZone: timeZoneResponse.status,
                 airQuality: airQualityResponse.status
             });
 
@@ -45,50 +42,49 @@ export async function getWeatherData(latitude, longitude, locationName) {
                 throw new Error(`Weather data not available: ${weatherResponse.status}`);
             }
 
-            const [weatherData, timeZoneData, airQualityData] = await Promise.all([
+            const [weatherData, airQualityData] = await Promise.all([
                 weatherResponse.json(),
-                timeZoneResponse.json(),
                 airQualityResponse.json()
             ]);
 
-            debug('API data:', { weatherData, timeZoneData, airQualityData });
+            debug('API data:', { weatherData, airQualityData });
 
             // Format the data
             const result = {
                 current: {
-                    temperature_2m: weatherData.current.temp,
-                    apparent_temperature: weatherData.current.feels_like,
-                    precipitation: weatherData.current.rain ? weatherData.current.rain['1h'] : 0,
-                    weather_code: weatherData.current.weather[0].id,
-                    wind_speed_10m: weatherData.current.wind_speed,
-                    wind_direction_10m: weatherData.current.wind_deg,
-                    wind_gusts_10m: weatherData.current.wind_gust,
-                    relative_humidity_2m: weatherData.current.humidity,
-                    uv_index: weatherData.current.uvi,
-                    visibility: weatherData.current.visibility / 1000, // Convert to km
+                    temperature_2m: weatherData.current.temperature_2m,
+                    apparent_temperature: weatherData.current.apparent_temperature,
+                    precipitation: weatherData.current.precipitation,
+                    weather_code: weatherData.current.weather_code,
+                    wind_speed_10m: weatherData.current.wind_speed_10m,
+                    wind_direction_10m: weatherData.current.wind_direction_10m,
+                    wind_gusts_10m: weatherData.current.wind_gusts_10m,
+                    relative_humidity_2m: weatherData.current.relative_humidity_2m,
+                    uv_index: weatherData.hourly.uv_index[0],
+                    visibility: weatherData.hourly.visibility[0] / 1000, // Convert to km
                 },
                 hourly: {
-                    time: weatherData.hourly.map(h => h.dt * 1000), // Convert to milliseconds
-                    temperature_2m: weatherData.hourly.map(h => h.temp),
-                    precipitation_probability: weatherData.hourly.map(h => h.pop * 100),
-                    precipitation: weatherData.hourly.map(h => h.rain ? h.rain['1h'] : 0),
-                    weather_code: weatherData.hourly.map(h => h.weather[0].id),
-                    wind_speed_10m: weatherData.hourly.map(h => h.wind_speed),
-                    wind_direction_10m: weatherData.hourly.map(h => h.wind_deg),
-                    wind_gusts_10m: weatherData.hourly.map(h => h.wind_gust),
-                    uv_index: weatherData.hourly.map(h => h.uvi),
-                    visibility: weatherData.hourly.map(h => h.visibility / 1000)
+                    time: weatherData.hourly.time.map(t => new Date(t).getTime()),
+                    temperature_2m: weatherData.hourly.temperature_2m,
+                    precipitation_probability: weatherData.hourly.precipitation_probability,
+                    precipitation: weatherData.hourly.precipitation,
+                    weather_code: weatherData.hourly.weather_code,
+                    wind_speed_10m: weatherData.hourly.wind_speed_10m,
+                    wind_direction_10m: weatherData.hourly.wind_direction_10m,
+                    wind_gusts_10m: weatherData.hourly.wind_gusts_10m,
+                    uv_index: weatherData.hourly.uv_index,
+                    visibility: weatherData.hourly.visibility.map(v => v / 1000)
                 },
-                air_quality: {
-                    pm2_5: airQualityData.current.air_quality.pm2_5,
-                    pm10: airQualityData.current.air_quality.pm10,
-                    o3: airQualityData.current.air_quality.o3,
-                    no2: airQualityData.current.air_quality.no2,
-                    so2: airQualityData.current.air_quality.so2,
-                    co: airQualityData.current.air_quality.co,
-                    us_epa_index: airQualityData.current.air_quality['us-epa-index']
-                },
-                timezone: timeZoneData.timezone,
+                air_quality: airQualityData.data.iaqi ? {
+                    pm2_5: airQualityData.data.iaqi.pm25?.v || 0,
+                    pm10: airQualityData.data.iaqi.pm10?.v || 0,
+                    o3: airQualityData.data.iaqi.o3?.v || 0,
+                    no2: airQualityData.data.iaqi.no2?.v || 0,
+                    so2: airQualityData.data.iaqi.so2?.v || 0,
+                    co: airQualityData.data.iaqi.co?.v || 0,
+                    us_epa_index: airQualityData.data.aqi
+                } : null,
+                timezone: weatherData.timezone,
                 location_name: locationName
             };
 
@@ -110,7 +106,7 @@ export async function getWeatherData(latitude, longitude, locationName) {
 export async function getCoordinates(location) {
     try {
         console.log('Getting coordinates for location:', location);
-        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`;
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${GOOGLE_MAPS_API_KEY}`;
         console.log('Geocoding API URL:', url);
 
         try {
@@ -130,9 +126,9 @@ export async function getCoordinates(location) {
             }
             
             const result = {
-                latitude: data.results[0].latitude,
-                longitude: data.results[0].longitude,
-                name: data.results[0].name
+                latitude: data.results[0].geometry.location.lat,
+                longitude: data.results[0].geometry.location.lng,
+                name: data.results[0].formatted_address.split(',')[0]
             };
             
             console.log('Geocoding result:', result);
@@ -168,54 +164,46 @@ export async function getCurrentLocation() {
         const { latitude, longitude } = position.coords;
         debug('Got coordinates:', { latitude, longitude });
 
-        // Default to coordinates if reverse geocoding fails
-        const defaultResult = {
-            latitude,
-            longitude,
-            name: 'Current Location'
-        };
-        
+        // Use Google Maps Reverse Geocoding
         try {
-            const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}`;
+            const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`;
             debug('Reverse geocoding URL:', url);
             
             const response = await fetch(url, API_OPTIONS);
             debug('Reverse geocoding response status:', response.status);
             
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Reverse geocoding error:', errorText);
-                return defaultResult;
+                throw new Error('Reverse geocoding failed');
             }
             
             const data = await response.json();
             debug('Reverse geocoding response:', data);
 
             if (!data.results || !data.results.length) {
-                return defaultResult;
+                throw new Error('No results from reverse geocoding');
             }
 
-            const result = {
+            // Find the locality (city) component
+            const locality = data.results[0].address_components.find(
+                component => component.types.includes('locality')
+            );
+
+            return {
                 latitude,
                 longitude,
-                name: data.results[0].name
+                name: locality ? locality.long_name : 'Current Location'
             };
-            
-            debug('Final location data:', result);
-            return result;
         } catch (error) {
-            console.warn('Reverse geocoding failed, using fallback:', error);
-            return defaultResult;
+            console.error('Reverse geocoding error:', error);
+            // Fall back to coordinates if reverse geocoding fails
+            return {
+                latitude,
+                longitude,
+                name: 'Current Location'
+            };
         }
     } catch (error) {
         console.error('Geolocation error:', error);
-        if (error.code === 1) {
-            throw new Error('Location access denied. Please allow location access or use the search bar.');
-        } else if (error.code === 2) {
-            throw new Error('Unable to determine your location. Please try again or use the search bar.');
-        } else if (error.code === 3) {
-            throw new Error('Location request timed out. Please try again or use the search bar.');
-        }
-        throw new Error('Unable to get your location. Please try again or use the search bar.');
+        throw new Error('Unable to get your location. Please check your browser settings and try again.');
     }
 } 
