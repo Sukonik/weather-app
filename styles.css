@@ -79,7 +79,7 @@
     --accent-blue: #ff7e5f;
 }
 
-:root[data-theme="boba-tea"] {
+:root[data-theme="coffee"] {
     --primary-bg: #f3e9dc;
     --secondary-bg: #e6d5c3;
     --text-primary: #4a3728;
