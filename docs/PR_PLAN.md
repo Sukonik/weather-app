@@ -4,6 +4,17 @@
 
 This plan breaks the work into small, reviewable PRs. Each PR should be independently shippable and deployable via GitHub Pages.
 
+## PR Preview Infrastructure
+**Status: done**
+
+Every PR from now on ships to its own preview link, so changes can be reviewed live before merging — no more blind merges.
+
+- `.github/workflows/deploy-main.yml`: publishes `main` to the `gh-pages` branch root → production at https://sukonik.github.io/weather-app/
+- `.github/workflows/pr-preview.yml`: publishes each open PR to `gh-pages` under `pr-preview/pr-<NUMBER>/` → preview at `https://sukonik.github.io/weather-app/pr-preview/pr-<NUMBER>/`, updated on every push, torn down on close
+- **One-time manual step (GitHub UI only):** Settings → Pages → Source → "Deploy from a branch" → `gh-pages` → `/ (root)`
+
+From PR 2 onward: work happens on its own branch, gets its own PR, and that PR's description includes its live preview link before it's handed back for review.
+
 ---
 
 ## PR 1 — Design System Overhaul (DarkSky-inspired)

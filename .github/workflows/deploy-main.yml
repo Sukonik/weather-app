@@ -1,0 +1,28 @@
+name: Deploy production (main)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish main to gh-pages root
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          # Preserve PR preview subfolders written by pr-preview.yml
+          keep_files: true
+          exclude_assets: '.github'
+          commit_message: 'Deploy production: ${{ github.event.head_commit.message }}'

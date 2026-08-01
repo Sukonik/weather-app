@@ -71,6 +71,15 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
+## Deployment & PR Previews
+
+- **Production**: pushes to `main` auto-deploy to https://sukonik.github.io/weather-app/ via `.github/workflows/deploy-main.yml`
+- **PR previews**: every open pull request gets its own live preview URL, auto-built by `.github/workflows/pr-preview.yml`:
+  `https://sukonik.github.io/weather-app/pr-preview/pr-<NUMBER>/`
+  The preview updates on every push to the PR branch and is torn down automatically when the PR closes.
+
+One-time setup required in the GitHub UI (not doable from the repo alone): under **Settings → Pages**, set the Pages source to **"Deploy from a branch" → `gh-pages` → `/ (root)`**. Both workflows above publish to `gh-pages`; production lives at the branch root and each PR preview lives under `pr-preview/pr-<NUMBER>/`, so they coexist without clobbering each other.
+
 ## Data Source
 
 Weather and air quality data are provided free of charge by [Open-Meteo](https://open-meteo.com/), which does not require an API key. See their [terms of use](https://open-meteo.com/en/terms) for attribution and usage limits.
