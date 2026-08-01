@@ -1,3 +1,42 @@
+/* ============================================
+   Design tokens — shared across every theme
+   ============================================ */
+:root {
+    /* Spacing scale */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-8: 3rem;
+
+    /* Radius scale */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-pill: 999px;
+
+    /* Elevation */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.16);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.22);
+
+    /* Type scale */
+    --font-hero: clamp(3.5rem, 16vw, 6.5rem);
+    --font-xl: clamp(1.5rem, 5vw, 2rem);
+    --font-lg: clamp(1.15rem, 3.5vw, 1.35rem);
+    --font-md: 1rem;
+    --font-sm: 0.875rem;
+    --font-xs: 0.75rem;
+
+    /* Safe-area insets (notch / home-indicator devices) */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+}
+
 /* Theme Variables */
 :root[data-theme="dark"] {
     --primary-bg: #1a1a1a;
@@ -7,6 +46,8 @@
     --accent: #007AFF;
     --accent-rgb: 0, 122, 255;
     --hover-bg: rgba(255, 255, 255, 0.1);
+    --gradient-start: #0f1620;
+    --gradient-end: #1a1a1a;
 }
 
 :root[data-theme="light"] {
@@ -17,6 +58,8 @@
     --accent: #007AFF;
     --accent-rgb: 0, 122, 255;
     --hover-bg: rgba(0, 0, 0, 0.05);
+    --gradient-start: #eef4ff;
+    --gradient-end: #f5f5f5;
 }
 
 :root[data-theme="ocean"] {
@@ -27,6 +70,8 @@
     --accent: #3498db;
     --accent-rgb: 52, 152, 219;
     --hover-bg: rgba(52, 152, 219, 0.1);
+    --gradient-start: #0f2436;
+    --gradient-end: #1a2b3c;
 }
 
 :root[data-theme="jungle"] {
@@ -37,6 +82,32 @@
     --accent: #00b894;
     --accent-rgb: 0, 184, 148;
     --hover-bg: rgba(0, 184, 148, 0.1);
+    --gradient-start: #16201f;
+    --gradient-end: #2d3436;
+}
+
+:root[data-theme="sunset"] {
+    --primary-bg: #2b1e35;
+    --secondary-bg: #3d2a4a;
+    --text-primary: #fdf1e7;
+    --text-secondary: #d9b8c4;
+    --accent: #ff7e5f;
+    --accent-rgb: 255, 126, 95;
+    --hover-bg: rgba(255, 126, 95, 0.15);
+    --gradient-start: #2b1e35;
+    --gradient-end: #4a2c3d;
+}
+
+:root[data-theme="coffee"] {
+    --primary-bg: #2a1e18;
+    --secondary-bg: #3e2c22;
+    --text-primary: #f3e6d8;
+    --text-secondary: #c4a58c;
+    --accent: #c8853a;
+    --accent-rgb: 200, 133, 58;
+    --hover-bg: rgba(200, 133, 58, 0.15);
+    --gradient-start: #241a15;
+    --gradient-end: #3e2c22;
 }
 
 * {
@@ -47,11 +118,29 @@
 
 body {
     font-family: 'Inter', sans-serif;
-    background-color: var(--primary-bg);
     color: var(--text-primary);
     line-height: 1.6;
     min-height: 100vh;
+    background: linear-gradient(160deg, var(--gradient-start), var(--gradient-end) 60%, var(--primary-bg));
+    background-size: 200% 200%;
+    animation: ambientGradient 30s ease infinite;
     transition: background-color 0.3s, color 0.3s;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
+}
+
+@keyframes ambientGradient {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body {
+        animation: none;
+    }
 }
 
 /* Base styles */
@@ -174,15 +263,18 @@ header {
 
 .top-bar {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
 }
 
 .left-section {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 2rem;
+    gap: var(--space-4);
 }
 
 .theme-selector {
@@ -196,7 +288,7 @@ header {
     background-color: var(--secondary-bg);
     color: var(--text-primary);
     padding: 0.5rem 1rem;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     border: none;
     transition: background-color 0.2s;
@@ -212,7 +304,7 @@ header {
     left: 0;
     margin-top: 0.5rem;
     background-color: var(--secondary-bg);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 0.5rem;
     display: none;
     z-index: 1000;
@@ -269,7 +361,7 @@ header {
     align-items: center;
     background-color: var(--secondary-bg);
     padding: 0.5rem;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     gap: 1rem;
 }
 
@@ -331,7 +423,7 @@ input[type="text"] {
     width: 100%;
     padding: 0.8rem 1rem;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background-color: var(--secondary-bg);
     color: var(--text-primary);
     font-size: 1rem;
@@ -343,7 +435,7 @@ input[type="text"] {
     left: 0;
     right: 0;
     background-color: var(--secondary-bg);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     margin-top: 0.5rem;
     max-height: 200px;
     overflow-y: auto;
@@ -377,7 +469,7 @@ input[type="text"] {
 button {
     padding: 0.8rem 1rem;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background-color: var(--accent);
     color: white;
     cursor: pointer;
@@ -390,21 +482,25 @@ button:hover {
 
 .current-weather {
     text-align: center;
-    margin-bottom: 3rem;
-    padding: 2rem;
+    margin-bottom: var(--space-8);
+    padding: var(--space-6) var(--space-4);
     background-color: var(--secondary-bg);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 }
 
 .location {
-    font-size: 2rem;
-    margin-bottom: 1rem;
+    font-size: var(--font-xl);
+    font-weight: 600;
+    margin-bottom: var(--space-4);
 }
 
 .temperature-container {
-    font-size: 4rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
+    font-size: var(--font-hero);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin-bottom: var(--space-4);
     cursor: pointer;
     transition: opacity 0.2s;
 }
@@ -428,7 +524,7 @@ button:hover {
 .detail-item {
     background-color: var(--secondary-bg);
     padding: 1.5rem;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -472,7 +568,7 @@ button:hover {
 .hourly-forecast {
     background-color: var(--secondary-bg);
     padding: 2rem;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
 }
 
 .hourly-forecast h2 {
@@ -512,7 +608,7 @@ button:hover {
     min-width: 120px;
     padding: 1rem;
     background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     transition: transform 0.2s;
 }
 
@@ -577,7 +673,7 @@ button:hover {
 
 .detail-card {
     background-color: var(--secondary-bg);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     padding: 1.5rem;
     transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -739,7 +835,7 @@ button:hover {
 
 .modal-content {
     background-color: var(--primary-bg);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
@@ -795,7 +891,7 @@ button:hover {
 .guide-item {
     padding: 1rem;
     background-color: var(--secondary-bg);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     transition: transform 0.2s;
 }
 
@@ -902,7 +998,7 @@ button:hover {
 
 .large-card {
     background-color: var(--secondary-bg);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     padding: clamp(1rem, 3vw, 1.5rem);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s, box-shadow 0.2s;
@@ -964,7 +1060,7 @@ button:hover {
     width: 100%;
     height: 200px;
     margin: 1rem 0;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background-color: rgba(255, 255, 255, 0.05);
 }
 
@@ -982,7 +1078,7 @@ button:hover {
     border: none;
     color: var(--text-primary);
     padding: 0.5rem 1rem;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background-color 0.2s;
     font-size: 1rem;
@@ -1062,22 +1158,35 @@ h1 {
 }
 
 /* Mobile navigation */
-@media (max-width: 768px) {
-    .nav-container {
+@media (max-width: 600px) {
+    .top-bar {
         flex-direction: column;
-        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .left-section {
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .unit-toggle {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .theme-dropdown {
+        left: 0;
+        right: auto;
+        min-width: 180px;
     }
 
     .search-container {
         width: 100%;
+        flex-wrap: wrap;
     }
 
-    .search-input {
+    input[type="text"] {
         width: 100%;
-    }
-
-    .theme-selector {
-        justify-content: center;
     }
 }
 
@@ -1100,7 +1209,7 @@ h1 {
     gap: 0.5rem;
     padding: 0.75rem;
     background: var(--secondary-bg);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     min-width: 80px;
 }
 
@@ -1117,7 +1226,7 @@ button,
 .error {
     padding: 1rem;
     text-align: center;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     margin: 1rem 0;
 }
 
@@ -1176,7 +1285,7 @@ button,
 
 .hourly-card {
     background-color: var(--secondary-bg);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
@@ -1232,7 +1341,7 @@ button,
     flex: 1;
     padding: 0.75rem;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background-color: var(--hover-bg);
     color: var(--text-primary);
     font-size: 0.9rem;
@@ -1253,7 +1362,7 @@ button,
 canvas {
     width: 100%;
     height: 200px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background-color: rgba(255, 255, 255, 0.05);
 }
 
@@ -1320,7 +1429,7 @@ canvas {
     background-color: #ff4444;
     color: white;
     padding: 1rem 2rem;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     z-index: 1001;
     display: none;
     text-align: center;

@@ -14,18 +14,29 @@ A modern, mobile-first weather app with real-time conditions, hourly forecasts, 
 - **Air quality (AQI)**: US AQI score with a status label, pollutant breakdown, and a built-in **ⓘ guide** explaining what each pollutant is, where it comes from, and why it matters
 - **Hourly precipitation & wind visualizations** with current-hour and next-8-hour views
 - **Location search** with autocomplete suggestions, plus one-tap "use my location"
-- **Multiple themes**: Dark, Light, Ocean, Jungle, and more
+- **6 themes**: Dark, Light, Ocean, Jungle, Sunset, and Coffee, each with a subtle animated ambient gradient background
 - **Unit toggles**: °C/°F and km/h/mph
 - **Responsive design** tuned for phones, tablets, and desktop, built to feel at home as an installed home-screen app
 
+## Vision
+
+The go-to coastal conditions weather app — a DarkSky-style visual, hour-by-hour clarity, with wind, UV, air quality, pollen, and tides in one clean, glanceable view. Free web app → installable home-screen wrapper → paid-tier native iOS app.
+
 ## Roadmap
 
-- [ ] Enhanced mobile-responsive redesign (in progress — see [PR plan](docs/PR_PLAN.md))
+- [x] Design system overhaul (design tokens, new themes, bold hero temperature, mobile-first top bar, safe-area insets) — see [PR plan](docs/PR_PLAN.md)
+- [ ] Hour-by-hour scrubbable timeline
 - [ ] Enhanced Wind section (gust callouts, compass direction indicator, richer hourly chart)
-- [ ] Enhanced Air Quality section with pollutant "ⓘ" explainer (deeper detail, health guidance, source icons)
+- [ ] Enhanced Air Quality section with pollutant "(i)" explainer (deeper detail, health guidance, EPA color bands)
+- [ ] Enhanced UV Index section with "(i)" safe-exposure guidance
+- [ ] Pollen & allergens
+- [ ] Coastal conditions: tide charts (à la Ocean Watch), marine layer, rip current risk
 - [ ] PWA support (installable web app, offline shell, app icons/splash screens)
-- [ ] Tide charts (à la Ocean Watch) — planned for a future PR
+- [ ] Custom domain (optional)
 - [ ] iOS App Store wrapper (Capacitor/PWA-to-native shell)
+- [ ] Premium tier (hurricanes, flood risk, extended forecast, radar, severe weather alerts)
+
+Full phased breakdown: [docs/PR_PLAN.md](docs/PR_PLAN.md).
 
 ## Tech Stack
 
