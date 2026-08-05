@@ -9,8 +9,10 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: pr-preview-${{ github.event.number }}
-  cancel-in-progress: true
+  # Shares one queue with deploy-main.yml (same group name) so a production
+  # deploy and any PR-preview publish never race writing to gh-pages at once.
+  group: gh-pages-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy-preview:
