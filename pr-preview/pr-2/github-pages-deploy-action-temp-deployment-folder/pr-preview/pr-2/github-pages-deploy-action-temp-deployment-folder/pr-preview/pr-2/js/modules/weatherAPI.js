@@ -2,7 +2,7 @@ export async function getWeatherData(latitude, longitude, locationName) {
     try {
         console.log('Fetching weather data for:', { latitude, longitude, locationName });
         
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility,precipitation_intensity,wind_speed_80m,wind_speed_120m&daily=precipitation_probability_max,precipitation_sum,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`;
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,visibility,precipitation_intensity,wind_speed_80m,wind_speed_120m&daily=precipitation_probability_max,precipitation_sum&timezone=auto`;
         const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,european_aqi,us_aqi,european_aqi_pm2_5,european_aqi_pm10,european_aqi_no2,european_aqi_o3,european_aqi_so2`;
 
         console.log('Making API requests to:', { weatherUrl, airQualityUrl });
