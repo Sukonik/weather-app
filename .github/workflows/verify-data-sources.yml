@@ -1,0 +1,35 @@
+name: Verify data sources (real network)
+
+# Calls the live Open-Meteo APIs (no mocks) for the six required test
+# locations and reports field-level completeness. Runs on GitHub's own
+# runner because it has open internet egress that the authoring
+# environment for this repo does not.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'js/modules/weatherAPI.js'
+      - 'scripts/verify-data-sources.mjs'
+      - '.github/workflows/verify-data-sources.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run real-data acceptance check
+        run: node scripts/verify-data-sources.mjs
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-source-report
+          path: |
+            data-source-report.json
+            data-source-report.md

@@ -61,33 +61,56 @@
                         <span class="current-date">---, --- --</span>
                     </div>
                 </div>
-                <div class="unit-toggle">
-                    <div class="temp-units">
-                        <button class="unit-btn active" data-unit="C">°C</button>
-                        <span class="separator">|</span>
-                        <button class="unit-btn" data-unit="F">°F</button>
+                <div class="right-section">
+                    <div class="unit-toggle">
+                        <div class="temp-units">
+                            <button class="unit-btn active" data-unit="C">°C</button>
+                            <span class="separator">|</span>
+                            <button class="unit-btn" data-unit="F">°F</button>
+                        </div>
+                        <span class="units-separator"></span>
+                        <div class="speed-units">
+                            <button class="speed-unit-btn active" data-speed-unit="km/h">km/h</button>
+                            <span class="separator">|</span>
+                            <button class="speed-unit-btn" data-speed-unit="mph">mph</button>
+                        </div>
                     </div>
-                    <span class="units-separator"></span>
-                    <div class="speed-units">
-                        <button class="speed-unit-btn active" data-speed-unit="km/h">km/h</button>
-                        <span class="separator">|</span>
-                        <button class="speed-unit-btn" data-speed-unit="mph">mph</button>
-                    </div>
+                    <nav class="nav-menu">
+                        <button id="nav-btn" class="nav-btn" aria-expanded="false" aria-controls="nav-dropdown">
+                            <i class="fas fa-bars"></i>
+                            <span>Menu</span>
+                        </button>
+                        <div class="nav-dropdown" id="nav-dropdown">
+                            <a href="index.html" class="nav-link active"><i class="fas fa-house"></i> Overview</a>
+                            <a href="tides.html" class="nav-link"><i class="fas fa-water"></i> Tide Charts</a>
+                            <a href="air-quality.html" class="nav-link"><i class="fas fa-wind"></i> Air Quality</a>
+                            <a href="wind.html" class="nav-link"><i class="fas fa-flag"></i> Wind Data</a>
+                            <a href="rain.html" class="nav-link"><i class="fas fa-cloud-rain"></i> Rain Data</a>
+                            <a href="uv.html" class="nav-link"><i class="fas fa-sun"></i> UV Index</a>
+                            <a href="moon.html" class="nav-link"><i class="fas fa-moon"></i> Moon Phases</a>
+                        </div>
+                    </nav>
                 </div>
             </div>
             <div class="search-container">
                 <div class="search-wrapper">
-                    <input type="text" id="location-search" placeholder="Search city, state, country...">
+                    <input type="text" id="location-search" placeholder="Search city, ZIP/postal code, country...">
                     <div id="search-suggestions" class="search-suggestions"></div>
                 </div>
                 <button id="search-btn"><i class="fas fa-search"></i></button>
                 <button id="current-location-btn"><i class="fas fa-location-dot"></i></button>
+            </div>
+            <div class="quick-locations">
+                <span class="quick-locations-label">Quick:</span>
+                <button class="quick-loc-btn" data-quick-zip="11561" data-quick-name="Long Beach, NY">Long Beach 11561</button>
+                <button class="quick-loc-btn" data-quick-zip="10001" data-quick-name="New York, NY">New York 10001</button>
             </div>
         </header>
 
         <main>
             <div class="current-weather">
                 <h1 class="location">Loading...</h1>
+                <div class="location-detail" id="location-detail"></div>
                 <div class="hero-main">
                     <i id="weather-icon" class="fas fa-cloud hero-icon"></i>
                     <div class="temperature-container">
@@ -104,6 +127,7 @@
                     <span class="hilo-sep">·</span>
                     <span class="hilo hilo-low"><i class="fas fa-arrow-down"></i><span id="temp-low">--°</span></span>
                 </div>
+                <div class="data-meta" id="data-meta"></div>
             </div>
 
             <div class="hourly-strip-section">
@@ -131,6 +155,21 @@
                     <i class="fas fa-sun"></i>
                     <span class="label">UV Index</span>
                     <span class="value" id="uv-index">--</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-temperature-low"></i>
+                    <span class="label">Dew Point</span>
+                    <span class="value" id="dew-point">--°</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-gauge"></i>
+                    <span class="label">Pressure</span>
+                    <span class="value" id="pressure">-- hPa</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-cloud"></i>
+                    <span class="label">Cloud Cover</span>
+                    <span class="value" id="cloud-cover">--%</span>
                 </div>
             </div>
 
@@ -182,6 +221,7 @@
                     </div>
                     <div class="card-value" id="precipitation-chance">--%</div>
                     <div class="card-description" id="precipitation-desc">--</div>
+                    <div class="card-pollutants" id="precipitation-breakdown"></div>
                 </div>
 
                 <div class="detail-card air-quality-card">
@@ -193,7 +233,7 @@
                         <span>AIR QUALITY</span>
                     </div>
                     <div class="card-value" id="air-quality-value">--</div>
-                    <div class="card-description">US AQI</div>
+                    <div class="card-description">US AQI <span id="air-quality-eu"></span></div>
                     <div class="card-status" id="air-quality-status">--</div>
                     <div class="card-pollutants" id="air-quality-pollutants"></div>
                 </div>
@@ -244,7 +284,7 @@
                         <span>UV INDEX</span>
                     </div>
                     <div class="card-value" id="uv-index-value">--</div>
-                    <div class="card-description">Daytime UV</div>
+                    <div class="card-description">Current · Peak today: <span id="uv-index-peak">--</span></div>
                     <div class="card-status" id="uv-index-status">--</div>
                 </div>
 
