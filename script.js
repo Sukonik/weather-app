@@ -20,42 +20,11 @@ try {
     const { formatUpdatedTime } = await import('./js/modules/fetchUtils.js');
 
     let currentWeatherData = null;
-    let currentLocationMeta = null; // full geocoding result for the active location
     let currentHourIndex = 0;
     let precipMode = 'current';
     let windMode = 'current';
     let rainParticles = [];
     let windParticles = [];
-    let activeWeatherController = null; // AbortController for the in-flight weather fetch
-    let requestGeneration = 0; // guards against a slow, stale request rendering over a newer one
-
-    const LAST_LOCATION_KEY = 'clearsky:lastLocation';
-
-    function saveLastLocation(meta) {
-        try {
-            localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(meta));
-        } catch {
-            // storage unavailable — non-fatal
-        }
-    }
-
-    function loadLastLocation() {
-        try {
-            const raw = localStorage.getItem(LAST_LOCATION_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
-    }
-
-    /** Renders a value via `formatter`, or a styled "Data unavailable" marker
-     *  when the value is missing — never falls back to 0 or a bare "--". */
-    function fieldHTML(value, formatter) {
-        if (value === null || value === undefined || (typeof value === 'number' && Number.isNaN(value))) {
-            return '<span class="unavailable">Data unavailable</span>';
-        }
-        return formatter(value);
-    }
 
     const UNAVAILABLE = 'Data unavailable';
     const na = (value, fmt) => (value === null || value === undefined || Number.isNaN(value)) ? UNAVAILABLE : fmt(value);
@@ -229,17 +198,6 @@ try {
                     precipChance > 30 ? 'Moderate chance of precipitation' :
                     'Low chance of precipitation';
             }
-            const precipBreakdownEl = document.getElementById('precipitation-breakdown');
-            if (precipBreakdownEl) {
-                const rows = [
-                    { name: 'Rain', value: c.rain, unit: 'mm' },
-                    { name: 'Showers', value: c.showers, unit: 'mm' },
-                    { name: 'Snowfall', value: c.snowfall, unit: 'cm' }
-                ].filter(r => r.value !== undefined && r.value !== null && r.value > 0);
-                precipBreakdownEl.innerHTML = rows.length
-                    ? rows.map(r => `<div class="pollutant-item"><span class="pollutant-name">${r.name}</span><span class="pollutant-value">${r.value} ${r.unit}</span></div>`).join('')
-                    : '<div class="pollutant-item"><span class="pollutant-name">None currently falling</span></div>';
-            }
 
             // Air quality card
             const aqi = data.air_quality?.current?.us_aqi;
@@ -247,7 +205,6 @@ try {
             const aqiElement = document.getElementById('air-quality-value');
             const aqiStatus = document.getElementById('air-quality-status');
             const aqiDesc = document.querySelector('.air-quality-card .card-description');
-            const aqiEuEl = document.getElementById('air-quality-eu');
             const pollutantsContainer = document.getElementById('air-quality-pollutants');
 
             if (aqiElement) {
@@ -260,14 +217,15 @@ try {
                 : 'US AQI';
 
             if (pollutantsContainer) {
-                if (aq) {
+                if (data.air_quality?.current) {
+                    const current = data.air_quality.current;
                     const pollutants = [
-                        { name: 'PM2.5', value: aq.pm2_5, unit: 'μg/m³' },
-                        { name: 'PM10', value: aq.pm10, unit: 'μg/m³' },
-                        { name: 'Ozone', value: aq.ozone, unit: 'μg/m³' },
-                        { name: 'NO₂', value: aq.nitrogen_dioxide, unit: 'μg/m³' },
-                        { name: 'SO₂', value: aq.sulphur_dioxide, unit: 'μg/m³' },
-                        { name: 'CO', value: aq.carbon_monoxide, unit: 'μg/m³' }
+                        { name: 'PM2.5', value: current.pm2_5, unit: 'μg/m³' },
+                        { name: 'PM10', value: current.pm10, unit: 'μg/m³' },
+                        { name: 'Ozone', value: current.ozone, unit: 'μg/m³' },
+                        { name: 'NO₂', value: current.nitrogen_dioxide, unit: 'μg/m³' },
+                        { name: 'SO₂', value: current.sulphur_dioxide, unit: 'μg/m³' },
+                        { name: 'CO', value: current.carbon_monoxide, unit: 'μg/m³' }
                     ];
                     pollutantsContainer.innerHTML = pollutants
                         .filter(p => p.value !== undefined && p.value !== null)
@@ -412,15 +370,11 @@ try {
 
                 if (loadingElement) loadingElement.style.display = 'none';
             } catch (error) {
-                if (myGeneration !== requestGeneration) return; // superseded — ignore its error too
-                if (error.message === 'Request cancelled' || controller.signal.aborted) return;
                 console.error('Error updating weather:', error);
                 if (errorElement) {
                     errorElement.textContent = error.message || 'Unable to fetch weather data. Please try again.';
                 }
                 if (loadingElement) loadingElement.style.display = 'none';
-            } finally {
-                if (activeWeatherController === controller) activeWeatherController = null;
             }
         }
 
