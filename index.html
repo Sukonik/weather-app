@@ -22,6 +22,7 @@
         <main>
             <div class="current-weather">
                 <h1 class="location">Loading...</h1>
+                <div class="location-detail" id="location-detail"></div>
                 <div class="hero-main">
                     <i id="weather-icon" class="fas fa-cloud hero-icon"></i>
                     <div class="temperature-container">
@@ -38,6 +39,7 @@
                     <span class="hilo-sep">·</span>
                     <span class="hilo hilo-low"><i class="fas fa-arrow-down"></i><span id="temp-low">--°</span></span>
                 </div>
+                <div class="data-meta" id="data-meta"></div>
             </div>
 
             <div class="hourly-strip-section">
@@ -65,6 +67,21 @@
                     <i class="fas fa-sun"></i>
                     <span class="label">UV Index</span>
                     <span class="value" id="uv-index">--</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-temperature-low"></i>
+                    <span class="label">Dew Point</span>
+                    <span class="value" id="dew-point">--°</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-gauge"></i>
+                    <span class="label">Pressure</span>
+                    <span class="value" id="pressure">-- hPa</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-cloud"></i>
+                    <span class="label">Cloud Cover</span>
+                    <span class="value" id="cloud-cover">--%</span>
                 </div>
             </div>
 
@@ -149,6 +166,7 @@
                     </div>
                     <div class="card-value" id="precipitation-chance">--%</div>
                     <div class="card-description" id="precipitation-desc">--</div>
+                    <div class="card-pollutants" id="precipitation-breakdown"></div>
                 </div>
 
                 <div class="detail-card air-quality-card">
@@ -160,7 +178,7 @@
                         <span>AIR QUALITY</span>
                     </div>
                     <div class="card-value" id="air-quality-value">--</div>
-                    <div class="card-description">US AQI</div>
+                    <div class="card-description">US AQI <span id="air-quality-eu"></span></div>
                     <div class="card-status" id="air-quality-status">--</div>
                     <div class="card-pollutants" id="air-quality-pollutants"></div>
                 </div>
@@ -211,7 +229,7 @@
                         <span>UV INDEX</span>
                     </div>
                     <div class="card-value" id="uv-index-value">--</div>
-                    <div class="card-description">Daytime UV</div>
+                    <div class="card-description">Current · Peak today: <span id="uv-index-peak">--</span></div>
                     <div class="card-status" id="uv-index-status">--</div>
                 </div>
 

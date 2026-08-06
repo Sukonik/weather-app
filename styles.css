@@ -353,8 +353,90 @@ header {
     gap: var(--space-4);
 }
 
+.right-section {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
 .theme-selector {
     position: relative;
+}
+
+/* Top-right nav menu — compact dropdown, mirrors .theme-dropdown's pattern
+   so it never overlaps other controls at narrow widths. */
+.nav-menu {
+    position: relative;
+}
+
+.nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--secondary-bg);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.2s;
+}
+
+.nav-btn:hover {
+    background-color: var(--hover-bg);
+}
+
+.nav-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    display: none;
+    flex-direction: column;
+    z-index: 1000;
+    min-width: 190px;
+    box-shadow: var(--shadow-md);
+}
+
+.nav-dropdown.active {
+    display: flex;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-sm);
+    transition: background-color 0.2s;
+}
+
+.nav-link:hover {
+    background-color: var(--hover-bg);
+}
+
+.nav-link.active {
+    background-color: var(--accent);
+    color: white;
+}
+
+.nav-link i {
+    width: 1.1em;
+    text-align: center;
+    opacity: 0.85;
 }
 
 .theme-btn {
@@ -859,6 +941,71 @@ input[type="text"] {
     color: var(--text-secondary);
 }
 
+.suggestion-header {
+    padding: 0.5rem 1rem 0.25rem;
+    font-size: var(--font-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.loc-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.5rem;
+    font-size: var(--font-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.15);
+    border-radius: var(--radius-pill);
+    vertical-align: middle;
+}
+
+.quick-locations {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 600px;
+    margin: var(--space-2) auto 0;
+}
+
+.quick-locations-label {
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.quick-loc-btn {
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+    padding: 0.35rem 0.75rem;
+    font-size: var(--font-xs);
+    font-weight: 600;
+    border-radius: var(--radius-pill);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.quick-loc-btn:hover {
+    background: var(--hover-bg);
+}
+
+/* Genuinely-missing data (source failed / field not returned) — visually
+   distinct from the pre-load "--" skeleton, and never a bare 0. */
+.unavailable {
+    font-size: 0.8em;
+    font-style: italic;
+    font-weight: 500;
+    color: var(--text-secondary);
+    opacity: 0.75;
+}
+
 button {
     padding: 0.8rem 1rem;
     border: none;
@@ -888,7 +1035,20 @@ button:hover {
 .location {
     font-size: var(--font-xl);
     font-weight: 600;
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-1);
+}
+
+.current-weather .location-detail {
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-3);
+}
+
+.data-meta {
+    margin-top: var(--space-4);
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    opacity: 0.75;
 }
 
 .hero-main {
@@ -2029,4 +2189,86 @@ canvas {
 
 .error-message:not(:empty) {
     display: block;
+}
+
+/* Read-only location badge shown on the six secondary pages */
+.active-location-badge {
+    text-align: center;
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    margin-top: var(--space-2);
+}
+
+.active-location-badge i {
+    color: var(--accent);
+    margin-right: 0.35rem;
+}
+
+.active-location-badge a {
+    color: var(--accent);
+    text-decoration: none;
+    margin-left: 0.35rem;
+}
+
+.active-location-badge a:hover {
+    text-decoration: underline;
+}
+
+/* "Coming soon" stub pages (Tides / AQI / Wind / Rain / UV / Moon) */
+.stub-page {
+    max-width: 560px;
+    margin: var(--space-8) auto;
+    padding: var(--space-8) var(--space-6);
+    text-align: center;
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: var(--shadow-md);
+}
+
+.stub-icon {
+    font-size: 2.75rem;
+    color: var(--accent);
+    margin-bottom: var(--space-4);
+    filter: drop-shadow(0 0 20px rgba(var(--accent-rgb), 0.35));
+}
+
+.stub-title {
+    font-size: var(--font-xl);
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+}
+
+.stub-blurb {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-4);
+}
+
+.stub-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--hover-bg);
+    border-radius: var(--radius-pill);
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: var(--space-4);
+}
+
+.stub-sources {
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-5);
+}
+
+.stub-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-pill);
 }
