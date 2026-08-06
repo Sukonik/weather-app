@@ -1,0 +1,27 @@
+name: Real-Data Verification
+
+# Runs the 6-location real-network field-completeness check against every
+# live data source (Open-Meteo, NOAA, USNO). This is the ONLY way to get
+# genuine live-network results for this project, since local development
+# sandboxes here are network-restricted to an allowlist that excludes these
+# hosts — GitHub-hosted runners have full internet access.
+on:
+  pull_request:
+    paths:
+      - 'js/modules/weatherAPI.js'
+      - 'js/modules/tideAPI.js'
+      - 'js/modules/moonAPI.js'
+      - 'js/modules/location.js'
+      - 'scripts/verify-data-sources.mjs'
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run real-data verification
+        run: node scripts/verify-data-sources.mjs

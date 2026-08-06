@@ -117,4 +117,42 @@ export function getPrecipitationIntensity(intensity) {
     if (intensity < 2) return 'Moderate';
     if (intensity < 10) return 'Heavy';
     return 'Very Heavy';
-} 
+}
+
+export function getUVColor(uvIndex) {
+    if (uvIndex <= 2) return '#3bb44a';   // Low - green
+    if (uvIndex <= 5) return '#f1c40f';   // Moderate - yellow
+    if (uvIndex <= 7) return '#ff8c00';   // High - orange
+    if (uvIndex <= 10) return '#e53935';  // Very High - red
+    return '#8e44ad';                     // Extreme - purple
+}
+
+export function getCloudCoverDescription(pct) {
+    if (pct <= 10) return 'Clear';
+    if (pct <= 40) return 'Mostly Clear';
+    if (pct <= 70) return 'Partly Cloudy';
+    if (pct <= 90) return 'Mostly Cloudy';
+    return 'Overcast';
+}
+
+/**
+ * Formats a numeric value, or returns a polished "unavailable" label when
+ * the value is null/undefined — used everywhere instead of letting a
+ * missing reading silently render as 0.
+ */
+export function formatValueOrUnavailable(value, formatter, unavailableLabel = 'Data unavailable') {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+        return unavailableLabel;
+    }
+    return formatter(value);
+}
+
+export function convertPressure(hPa, targetUnit) {
+    if (targetUnit === 'inHg') return hPa * 0.02953;
+    return hPa; // hPa (== mb)
+}
+
+export function formatPressure(hPa, unit = 'hPa') {
+    if (hPa === null || hPa === undefined) return 'Data unavailable';
+    return unit === 'inHg' ? `${convertPressure(hPa, 'inHg').toFixed(2)} inHg` : `${Math.round(hPa)} hPa`;
+}
