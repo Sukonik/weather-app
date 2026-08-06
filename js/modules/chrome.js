@@ -25,6 +25,24 @@ let state = {
 
 const searchAbort = makeAbortGroup();
 const listeners = { locationchange: [] };
+let locationGeneration = 0; // bumped on every explicit location selection
+
+/**
+ * navigator.geolocation's own `timeout` option is only honored once the
+ * browser has resolved its permission prompt — if the prompt is left open
+ * or silently swallowed (seen in some embedded/headless contexts), the
+ * native call never settles at all, which would otherwise leave the
+ * loading UI stuck forever. A JS-level race guarantees this always
+ * resolves within ~9s no matter what the browser does.
+ */
+function getCurrentPositionWithHardTimeout() {
+    return Promise.race([
+        new Promise((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 })
+        ),
+        new Promise((_, reject) => setTimeout(() => reject({ code: 3 }), 9000))
+    ]);
+}
 
 export function onLocationChange(fn) {
     listeners.locationchange.push(fn);
@@ -148,6 +166,7 @@ function renderLocationSummary(root, loc) {
 }
 
 async function selectLocation(root, loc) {
+    locationGeneration++;
     state.location = loc;
     saveLastLocation(loc);
     renderLocationSummary(root, loc);
@@ -300,15 +319,16 @@ export function initChrome({ page = 'overview' } = {}) {
             return;
         }
         try {
-            const position = await new Promise((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
-            );
+            const position = await getCurrentPositionWithHardTimeout();
             const { latitude, longitude } = position.coords;
             const loc = await reverseGeocode(latitude, longitude);
             await selectLocation(mount, loc);
             if (errorBanner) errorBanner.textContent = '';
         } catch (error) {
-            if (errorBanner) errorBanner.textContent = 'Unable to get your location. Please allow location access or use the search bar.';
+            const message = error?.code === 1 ? 'Location access denied. Please allow location access or use the search bar.'
+                : error?.code === 3 ? 'Location request timed out. Please try again or use the search bar.'
+                : 'Unable to get your location. Please allow location access or use the search bar.';
+            if (errorBanner) errorBanner.textContent = message;
             console.error('Geolocation error:', error);
         }
     });
@@ -324,9 +344,18 @@ export function initChrome({ page = 'overview' } = {}) {
         mount.querySelector('#location-search').value = formatLocationLabel(state.location);
         emitLocationChange();
     } else if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-            const loc = await reverseGeocode(position.coords.latitude, position.coords.longitude);
-            await selectLocation(mount, loc);
-        }, () => { /* silent — user can search manually */ }, { timeout: 8000 });
+        // Silent background attempt — if the user searches or taps a quick
+        // location before this resolves, its result must not clobber their
+        // manual choice. Capture the generation counter and check it's
+        // still current before applying.
+        const startGeneration = locationGeneration;
+        getCurrentPositionWithHardTimeout()
+            .then(async (position) => {
+                if (locationGeneration !== startGeneration) return; // superseded by a manual selection
+                const loc = await reverseGeocode(position.coords.latitude, position.coords.longitude);
+                if (locationGeneration !== startGeneration) return;
+                await selectLocation(mount, loc);
+            })
+            .catch(() => { /* silent — user can search manually */ });
     }
 }
