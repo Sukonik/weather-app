@@ -14,7 +14,7 @@ try {
         formatSpeed,
         getPrecipitationIntensity
     } = await import('./js/modules/utils.js');
-    const { updateHourlyVisualizations, initializeAnimations, updatePrecipitationDisplay, updateWindDisplay, animate } = await import('./js/modules/visualization.js');
+    const { initializeAnimations, updatePrecipitationDisplay, updateWindDisplay, animate } = await import('./js/modules/visualization.js');
 
     // Global state
     let currentWeatherData = null;
@@ -46,7 +46,12 @@ try {
         setTheme(currentTheme);
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    // The module imports above are awaited before this point, which can take
+    // long enough (network/module resolution) that 'DOMContentLoaded' has
+    // already fired by the time we'd register a listener for it — that
+    // listener would then never run, silently breaking the whole app. Guard
+    // with a readyState check instead of registering unconditionally.
+    function initApp() {
         // DOM Elements (fixed selectors)
         const searchForm = document.getElementById('search-form');
         const searchInput = document.getElementById('location-search');
@@ -60,11 +65,6 @@ try {
         const weatherIconElement = document.getElementById('weather-icon');
         const precipCanvas = document.getElementById('precipCanvas');
         const windCanvas = document.getElementById('windCanvas');
-        const tempCanvas = document.getElementById('tempCanvas');
-        const timeDisplay = document.getElementById('time-display');
-        const prevHourBtn = document.getElementById('prev-hour');
-        const nextHourBtn = document.getElementById('next-hour');
-        const infoCards = document.querySelectorAll('.info-card');
         const precipCurrentBtn = document.getElementById('precip-current');
         const precipForecastBtn = document.getElementById('precip-forecast');
         const windCurrentBtn = document.getElementById('wind-current');
@@ -129,9 +129,20 @@ try {
                 }
             });
         }
+        if (searchInput) {
+            searchInput.addEventListener('input', handleSearchInput);
+        }
         if (currentLocationBtn) {
-            currentLocationBtn.addEventListener('click', () => {
-                getCurrentLocation().catch(handleError);
+            currentLocationBtn.addEventListener('click', async () => {
+                try {
+                    if (errorElement) errorElement.textContent = '';
+                    if (loadingElement) loadingElement.style.display = 'flex';
+                    const locationData = await getCurrentLocation();
+                    await updateWeather(locationData.latitude, locationData.longitude, locationData.name);
+                } catch (error) {
+                    handleError(error);
+                    if (loadingElement) loadingElement.style.display = 'none';
+                }
             });
         }
         unitToggleBtns.forEach(btn => {
@@ -201,16 +212,6 @@ try {
                 document.body.style.overflow = '';
             }
         });
-        prevHourBtn?.addEventListener('click', () => {
-            currentHourIndex = Math.max(0, currentHourIndex - 1);
-            updateTimeDisplay();
-            updateVisualizations();
-        });
-        nextHourBtn?.addEventListener('click', () => {
-            currentHourIndex = Math.min(11, currentHourIndex + 1);
-            updateTimeDisplay();
-            updateVisualizations();
-        });
 
         // Error Handler
         function handleError(error) {
@@ -249,20 +250,6 @@ try {
             speedUnitBtns.forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.speedUnit === currentSpeedUnit);
             });
-        }
-
-        async function handleSearch() {
-            const location = locationSearch.value.trim();
-            if (!location) return;
-
-            try {
-                const coords = await getCoordinates(location);
-                if (coords) {
-                    await getWeatherData(coords.latitude, coords.longitude, coords.name);
-                }
-            } catch (error) {
-                throw new Error('Location not found. Please try again.');
-            }
         }
 
         async function handleSearchInput(e) {
@@ -315,9 +302,9 @@ try {
                 `;
                 
                 div.addEventListener('click', () => {
-                    locationSearch.value = result.name;
+                    searchInput.value = result.name;
                     searchSuggestions.classList.remove('active');
-                    getWeatherData(result.latitude, result.longitude, result.name).catch(handleError);
+                    updateWeather(result.latitude, result.longitude, result.name).catch(handleError);
                 });
                 
                 searchSuggestions.appendChild(div);
@@ -326,122 +313,143 @@ try {
             searchSuggestions.classList.add('active');
         }
 
-        function updateTemperatureDisplays(data) {
+        function updateHeroTemperature(data) {
             const mainTemp = convertTemperature(data.current.temperature_2m, currentUnit);
             const feelsLike = convertTemperature(data.current.apparent_temperature, currentUnit);
-            
+
             temperatureElement.textContent = Math.round(mainTemp);
             document.querySelector('.unit').textContent = `°${currentUnit}`;
             feelsLikeElement.textContent = `Feels like: ${Math.round(feelsLike)}°`;
-            
-            if (hourlyContainer.children.length > 0) {
-                const hourlyItems = hourlyContainer.querySelectorAll('.forecast-item');
-                hourlyItems.forEach((item, index) => {
-                    const temp = convertTemperature(data.hourly.temperature_2m[index * 3], currentUnit);
-                    item.querySelector('.temp').textContent = `${Math.round(temp)}°`;
-                });
+
+            if (weatherIconElement) {
+                weatherIconElement.className = `fas ${getWeatherIcon(data.current.weather_code)} hero-icon`;
+            }
+
+            const highEl = document.getElementById('temp-high');
+            const lowEl = document.getElementById('temp-low');
+            if (data.daily?.temperature_2m_max?.length && highEl) {
+                highEl.textContent = `${Math.round(convertTemperature(data.daily.temperature_2m_max[0], currentUnit))}°`;
+            }
+            if (data.daily?.temperature_2m_min?.length && lowEl) {
+                lowEl.textContent = `${Math.round(convertTemperature(data.daily.temperature_2m_min[0], currentUnit))}°`;
             }
         }
 
+        function renderHourlyStrip(data) {
+            const strip = document.getElementById('hourly-strip');
+            if (!strip || !data.hourly?.time?.length) return;
+
+            const now = Date.now();
+            let startIdx = data.hourly.time.findIndex(t => t >= now);
+            if (startIdx < 0) startIdx = 0;
+
+            const count = 16;
+            const cards = [];
+            for (let i = startIdx; i < Math.min(startIdx + count, data.hourly.time.length); i++) {
+                const time = new Date(data.hourly.time[i]);
+                const label = i === startIdx ? 'Now' : time.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+                const temp = Math.round(convertTemperature(data.hourly.temperature_2m[i], currentUnit));
+                const icon = getWeatherIcon(data.hourly.weather_code[i]);
+                const precip = data.hourly.precipitation_probability[i];
+                cards.push(`
+                    <div class="hour-card">
+                        <span class="hour-time">${label}</span>
+                        <i class="fas ${icon}"></i>
+                        <span class="hour-temp">${temp}°</span>
+                        <span class="hour-precip">${precip > 0 ? `<i class="fas fa-tint"></i>${precip}%` : ''}</span>
+                    </div>
+                `);
+            }
+            strip.innerHTML = cards.join('');
+        }
+
         function updateWeatherDisplays(data) {
-            updateTemperatureDisplays(data);
-            
+            updateHeroTemperature(data);
+            renderHourlyStrip(data);
+
             const windDirection = getWindDirection(data.current.wind_direction_10m);
-            const windSpeed = formatSpeed(data.current.wind_speed_10m);
-            const windGusts = formatSpeed(data.current.wind_gusts_10m);
-            
+            const windSpeed = formatSpeed(data.current.wind_speed_10m, currentSpeedUnit);
+            const windGusts = formatSpeed(data.current.wind_gusts_10m, currentSpeedUnit);
+
             windElement.innerHTML = `
-                <div class="wind-speed">${windSpeed} ${windDirection}</div>
-                <div class="wind-gusts">Gusts: ${windGusts}</div>
+                <span class="wind-speed">${windSpeed} ${windDirection}</span>
+                <span class="wind-gusts">Gusts: ${windGusts}</span>
             `;
-            
+
             humidityElement.textContent = `${Math.round(data.current.relative_humidity_2m)}%`;
             precipitationElement.textContent = `${data.current.precipitation} mm`;
             uvIndexElement.textContent = Math.round(data.current.uv_index);
-            
+
             descriptionElement.textContent = getWeatherDescription(data.current.weather_code);
-            updateHourlyForecast(data.hourly);
 
             // Update detailed cards
-            const precipChance = data.daily.precipitation_probability_max[0];
-            document.getElementById('precipitation-chance').textContent = `${precipChance}%`;
-            document.getElementById('precipitation-desc').textContent = 
-                precipChance > 70 ? 'High chance of precipitation' :
-                precipChance > 30 ? 'Moderate chance of precipitation' :
-                'Low chance of precipitation';
+            const precipChance = data.daily?.precipitation_probability_max?.[0] ?? 0;
+            const precipChanceEl = document.getElementById('precipitation-chance');
+            const precipDescEl = document.getElementById('precipitation-desc');
+            if (precipChanceEl) precipChanceEl.textContent = `${precipChance}%`;
+            if (precipDescEl) {
+                precipDescEl.textContent =
+                    precipChance > 70 ? 'High chance of precipitation' :
+                    precipChance > 30 ? 'Moderate chance of precipitation' :
+                    'Low chance of precipitation';
+            }
 
             // Update air quality card with Open-Meteo data
-            const aqi = data.air_quality?.current?.us_aqi || '--';
+            const aqi = data.air_quality?.current?.us_aqi;
             const aqiElement = document.getElementById('air-quality-value');
             const aqiStatus = document.getElementById('air-quality-status');
             const aqiDesc = document.querySelector('.air-quality-card .card-description');
             const pollutantsContainer = document.getElementById('air-quality-pollutants');
-            
-            aqiElement.textContent = aqi;
-            aqiElement.style.color = getAirQualityColor(aqi);
-            aqiStatus.textContent = getAirQualityDescription(aqi);
-            aqiDesc.textContent = getAirQualityImplication(aqi);
+
+            if (aqiElement) {
+                aqiElement.textContent = aqi ?? '--';
+                aqiElement.style.color = aqi != null ? getAirQualityColor(aqi) : '';
+            }
+            if (aqiStatus) aqiStatus.textContent = aqi != null ? getAirQualityDescription(aqi) : '--';
+            if (aqiDesc) aqiDesc.textContent = aqi != null ? getAirQualityImplication(aqi) : 'US AQI';
 
             // Update pollutants information
-            if (data.air_quality?.current) {
-                const current = data.air_quality.current;
-                const pollutants = [
-                    { name: 'PM2.5', value: current.pm2_5, unit: 'μg/m³' },
-                    { name: 'PM10', value: current.pm10, unit: 'μg/m³' },
-                    { name: 'Ozone', value: current.ozone, unit: 'μg/m³' },
-                    { name: 'NO₂', value: current.nitrogen_dioxide, unit: 'μg/m³' },
-                    { name: 'SO₂', value: current.sulphur_dioxide, unit: 'μg/m³' },
-                    { name: 'CO', value: current.carbon_monoxide, unit: 'μg/m³' }
-                ];
+            if (pollutantsContainer) {
+                if (data.air_quality?.current) {
+                    const current = data.air_quality.current;
+                    const pollutants = [
+                        { name: 'PM2.5', value: current.pm2_5, unit: 'μg/m³' },
+                        { name: 'PM10', value: current.pm10, unit: 'μg/m³' },
+                        { name: 'Ozone', value: current.ozone, unit: 'μg/m³' },
+                        { name: 'NO₂', value: current.nitrogen_dioxide, unit: 'μg/m³' },
+                        { name: 'SO₂', value: current.sulphur_dioxide, unit: 'μg/m³' },
+                        { name: 'CO', value: current.carbon_monoxide, unit: 'μg/m³' }
+                    ];
 
-                pollutantsContainer.innerHTML = pollutants
-                    .filter(p => p.value !== undefined && p.value !== null)
-                    .map(p => `
-                        <div class="pollutant-item">
-                            <span class="pollutant-name">${p.name}</span>
-                            <span class="pollutant-value">${Math.round(p.value)} ${p.unit}</span>
-                        </div>
-                    `).join('');
+                    pollutantsContainer.innerHTML = pollutants
+                        .filter(p => p.value !== undefined && p.value !== null)
+                        .map(p => `
+                            <div class="pollutant-item">
+                                <span class="pollutant-name">${p.name}</span>
+                                <span class="pollutant-value">${Math.round(p.value)} ${p.unit}</span>
+                            </div>
+                        `).join('');
 
-                if (!pollutantsContainer.innerHTML) {
+                    if (!pollutantsContainer.innerHTML) {
+                        pollutantsContainer.innerHTML = '<div class="pollutant-item">No detailed data available</div>';
+                    }
+                } else {
                     pollutantsContainer.innerHTML = '<div class="pollutant-item">No detailed data available</div>';
                 }
-            } else {
-                pollutantsContainer.innerHTML = '<div class="pollutant-item">No detailed data available</div>';
             }
 
             const uvIndex = Math.round(data.current.uv_index);
-            document.getElementById('uv-index-value').textContent = uvIndex;
-            document.getElementById('uv-index-status').textContent = getUVIndexDescription(uvIndex);
+            const uvValueEl = document.getElementById('uv-index-value');
+            const uvStatusEl = document.getElementById('uv-index-status');
+            if (uvValueEl) uvValueEl.textContent = uvIndex;
+            if (uvStatusEl) uvStatusEl.textContent = getUVIndexDescription(uvIndex);
 
             const visibilityMeters = data.current.visibility;
             const visibilityKm = (visibilityMeters / 1000).toFixed(1);
-            document.getElementById('visibility-value').textContent = `${visibilityKm} km`;
-            document.getElementById('visibility-status').textContent = getVisibilityDescription(visibilityMeters);
-
-            // Update precipitation visualization
-            if (data.hourly) {
-                updatePrecipitationVisualization(data.hourly);
-            }
-
-            // Update hourly charts
-            if (data.hourly) {
-                updateHourlyCharts(data.hourly);
-            }
-
-            // Initialize and update visualizations
-            initCanvases();
-            updateTimeDisplay();
-            updateVisualizations();
-        }
-
-        function updateTimeDisplay() {
-            if (!currentWeatherData) return;
-            const time = new Date(currentWeatherData.hourly.time[currentHourIndex]);
-            const hour = time.getHours();
-            const hourStr = hour % 12 || 12;
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            timeDisplay.textContent = `${hourStr}:00 ${ampm}`;
+            const visValueEl = document.getElementById('visibility-value');
+            const visStatusEl = document.getElementById('visibility-status');
+            if (visValueEl) visValueEl.textContent = `${visibilityKm} km`;
+            if (visStatusEl) visStatusEl.textContent = getVisibilityDescription(visibilityMeters);
         }
 
         function initCanvases() {
@@ -592,14 +600,6 @@ try {
         if (precipCanvas) resizeObserver.observe(precipCanvas);
         if (windCanvas) resizeObserver.observe(windCanvas);
 
-        // Update the legend to match the new visualization
-        const windLegend = document.querySelector('.wind-legend');
-        windLegend.innerHTML = `
-            <span class="legend-item">Surface Wind</span>
-            <span class="legend-item">Wind Gusts</span>
-            <span class="legend-item">80m Wind</span>
-        `;
-
         async function init() {
             try {
                 if (!navigator.geolocation) {
@@ -634,29 +634,16 @@ try {
                 
                 currentWeatherData = data;
                 console.log('Weather data updated:', data);
-                
+
                 // Update all displays
                 locationElement.textContent = locationName;
-                const temp = Math.round(convertTemperature(data.current.temperature_2m, currentUnit));
-                temperatureElement.textContent = temp;
-                document.querySelector('.unit').textContent = `°${currentUnit}`;
-                
-                const feelsLikeTemp = Math.round(convertTemperature(data.current.apparent_temperature, currentUnit));
-                feelsLikeElement.textContent = `Feels like: ${feelsLikeTemp}°`;
-                
-                descriptionElement.textContent = getWeatherDescription(data.current.weather_code);
-                
-                // Update weather details
-                windElement.textContent = `${Math.round(data.current.wind_speed_10m)} ${currentSpeedUnit}`;
-                humidityElement.textContent = `${Math.round(data.current.relative_humidity_2m)}%`;
-                precipitationElement.textContent = `${data.current.precipitation} mm`;
-                uvIndexElement.textContent = Math.round(data.current.uv_index);
-                
+                updateWeatherDisplays(data);
+
                 // Initialize visualizations
                 setupHourlyAnimations();
                 updateHourlyPrecipitation();
                 updateHourlyWind();
-                
+
                 if (loadingElement) loadingElement.style.display = 'none';
             } catch (error) {
                 console.error('Error updating weather:', error);
@@ -667,57 +654,6 @@ try {
             }
         }
 
-        function updateDisplay() {
-            if (!currentWeatherData) return;
-
-            // Update location and current conditions
-            locationElement.textContent = currentWeatherData.location_name;
-            temperatureElement.textContent = 
-                `${Math.round(convertTemperature(currentWeatherData.current.temperature_2m, 'F'))}°F`;
-            descriptionElement.textContent = 
-                getWeatherDescription(currentWeatherData.current.weather_code);
-            
-            // Update weather icon
-            const iconClass = getWeatherIcon(currentWeatherData.current.weather_code);
-            weatherIconElement.className = `fas ${iconClass}`;
-
-            // Update hourly visualizations
-            updateHourlyVisualizations(currentWeatherData, currentHourIndex);
-
-            // Update additional info cards
-            updateInfoCards();
-        }
-
-        function updateInfoCards() {
-            infoCards.forEach(card => {
-                const type = card.getAttribute('data-type');
-                const value = card.querySelector('.value');
-                const description = card.querySelector('.description');
-
-                switch (type) {
-                    case 'feels-like':
-                        value.textContent = `${Math.round(convertTemperature(currentWeatherData.current.apparent_temperature, 'F'))}°F`;
-                        break;
-                    case 'humidity':
-                        value.textContent = `${Math.round(currentWeatherData.current.relative_humidity_2m)}%`;
-                        break;
-                    case 'uv-index':
-                        value.textContent = Math.round(currentWeatherData.current.uv_index);
-                        description.textContent = getUVIndexDescription(currentWeatherData.current.uv_index);
-                        break;
-                    case 'visibility':
-                        value.textContent = `${(currentWeatherData.current.visibility / 1000).toFixed(1)} km`;
-                        description.textContent = getVisibilityDescription(currentWeatherData.current.visibility);
-                        break;
-                    case 'air-quality':
-                        const aqi = currentWeatherData.air_quality.current.us_aqi;
-                        value.textContent = aqi;
-                        description.textContent = getAirQualityDescription(aqi);
-                        break;
-                }
-            });
-        }
-
         // Initialize the app
         try {
             init();
@@ -725,7 +661,13 @@ try {
             console.error('App initialization error:', error);
             if (errorElement) errorElement.textContent = error.message;
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        initApp();
+    }
 } catch (error) {
     console.error('Failed to load modules:', error);
     const errorElement = document.getElementById('error');

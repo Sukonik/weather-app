@@ -37,7 +37,10 @@
     --safe-right: env(safe-area-inset-right, 0px);
 }
 
-/* Theme Variables */
+/* Theme Variables
+   Each theme defines: primary/secondary surfaces, text, accent, an ambient
+   background gradient pair, two "aurora" blob colors for the atmospheric
+   background layer, and a translucent card surface + border for the glass look. */
 :root[data-theme="dark"] {
     --primary-bg: #1a1a1a;
     --secondary-bg: #2a2a2a;
@@ -48,66 +51,90 @@
     --hover-bg: rgba(255, 255, 255, 0.1);
     --gradient-start: #0f1620;
     --gradient-end: #1a1a1a;
+    --aurora-a: rgba(0, 122, 255, 0.28);
+    --aurora-b: rgba(88, 86, 214, 0.22);
+    --card-surface: rgba(255, 255, 255, 0.06);
+    --card-border: rgba(255, 255, 255, 0.09);
 }
 
 :root[data-theme="light"] {
-    --primary-bg: #f5f5f5;
+    --primary-bg: #f0f3f8;
     --secondary-bg: #ffffff;
     --text-primary: #1a1a1a;
-    --text-secondary: #666666;
+    --text-secondary: #5c5c5c;
     --accent: #007AFF;
     --accent-rgb: 0, 122, 255;
     --hover-bg: rgba(0, 0, 0, 0.05);
-    --gradient-start: #eef4ff;
-    --gradient-end: #f5f5f5;
+    --gradient-start: #eaf1ff;
+    --gradient-end: #f4f7fb;
+    --aurora-a: rgba(0, 122, 255, 0.14);
+    --aurora-b: rgba(88, 86, 214, 0.1);
+    --card-surface: rgba(255, 255, 255, 0.65);
+    --card-border: rgba(255, 255, 255, 0.8);
 }
 
 :root[data-theme="ocean"] {
-    --primary-bg: #1a2b3c;
-    --secondary-bg: #2c3e50;
-    --text-primary: #ecf0f1;
-    --text-secondary: #bdc3c7;
-    --accent: #3498db;
-    --accent-rgb: 52, 152, 219;
-    --hover-bg: rgba(52, 152, 219, 0.1);
-    --gradient-start: #0f2436;
-    --gradient-end: #1a2b3c;
+    --primary-bg: #16283a;
+    --secondary-bg: #22384f;
+    --text-primary: #ecf6fb;
+    --text-secondary: #a9c3d4;
+    --accent: #33b7e0;
+    --accent-rgb: 51, 183, 224;
+    --hover-bg: rgba(51, 183, 224, 0.12);
+    --gradient-start: #0c1f2f;
+    --gradient-end: #1a3348;
+    --aurora-a: rgba(51, 183, 224, 0.28);
+    --aurora-b: rgba(0, 184, 148, 0.16);
+    --card-surface: rgba(255, 255, 255, 0.06);
+    --card-border: rgba(255, 255, 255, 0.1);
 }
 
 :root[data-theme="jungle"] {
-    --primary-bg: #2d3436;
-    --secondary-bg: #1e272e;
-    --text-primary: #dfe6e9;
-    --text-secondary: #b2bec3;
-    --accent: #00b894;
-    --accent-rgb: 0, 184, 148;
-    --hover-bg: rgba(0, 184, 148, 0.1);
-    --gradient-start: #16201f;
-    --gradient-end: #2d3436;
+    --primary-bg: #212c28;
+    --secondary-bg: #263832;
+    --text-primary: #e3efe9;
+    --text-secondary: #a9c2b7;
+    --accent: #22c98f;
+    --accent-rgb: 34, 201, 143;
+    --hover-bg: rgba(34, 201, 143, 0.12);
+    --gradient-start: #142019;
+    --gradient-end: #223a30;
+    --aurora-a: rgba(34, 201, 143, 0.26);
+    --aurora-b: rgba(255, 213, 79, 0.1);
+    --card-surface: rgba(255, 255, 255, 0.06);
+    --card-border: rgba(255, 255, 255, 0.1);
 }
 
 :root[data-theme="sunset"] {
-    --primary-bg: #2b1e35;
-    --secondary-bg: #3d2a4a;
+    --primary-bg: #241726;
+    --secondary-bg: #34203a;
     --text-primary: #fdf1e7;
-    --text-secondary: #d9b8c4;
+    --text-secondary: #d9b3c2;
     --accent: #ff7e5f;
     --accent-rgb: 255, 126, 95;
     --hover-bg: rgba(255, 126, 95, 0.15);
-    --gradient-start: #2b1e35;
-    --gradient-end: #4a2c3d;
+    --gradient-start: #241726;
+    --gradient-end: #3d2340;
+    --aurora-a: rgba(255, 126, 95, 0.32);
+    --aurora-b: rgba(255, 195, 113, 0.16);
+    --card-surface: rgba(255, 255, 255, 0.07);
+    --card-border: rgba(255, 255, 255, 0.12);
 }
 
 :root[data-theme="coffee"] {
-    --primary-bg: #2a1e18;
-    --secondary-bg: #3e2c22;
-    --text-primary: #f3e6d8;
-    --text-secondary: #c4a58c;
-    --accent: #c8853a;
-    --accent-rgb: 200, 133, 58;
-    --hover-bg: rgba(200, 133, 58, 0.15);
-    --gradient-start: #241a15;
-    --gradient-end: #3e2c22;
+    --primary-bg: #f4ece1;
+    --secondary-bg: #fffaf3;
+    --text-primary: #4a3728;
+    --text-secondary: #8a6a52;
+    --accent: #b0723c;
+    --accent-rgb: 176, 114, 60;
+    --hover-bg: rgba(176, 114, 60, 0.1);
+    --gradient-start: #f7ead9;
+    --gradient-end: #f1e2cf;
+    --aurora-a: rgba(176, 114, 60, 0.18);
+    --aurora-b: rgba(122, 156, 112, 0.12);
+    --card-surface: rgba(255, 255, 255, 0.55);
+    --card-border: rgba(255, 255, 255, 0.75);
 }
 
 * {
@@ -117,6 +144,7 @@
 }
 
 body {
+    position: relative;
     font-family: 'Inter', sans-serif;
     color: var(--text-primary);
     line-height: 1.6;
@@ -129,6 +157,37 @@ body {
     padding-bottom: var(--safe-bottom);
     padding-left: var(--safe-left);
     padding-right: var(--safe-right);
+    overflow-x: hidden;
+}
+
+/* Atmospheric "aurora" layer: two soft drifting color blobs behind the
+   content, tinted per theme, for a livelier hero backdrop than a flat
+   gradient. Fixed + pointer-events:none so it never affects layout/scroll. */
+body::before,
+body::after {
+    content: '';
+    position: fixed;
+    width: min(70vw, 640px);
+    height: min(70vw, 640px);
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.9;
+}
+
+body::before {
+    top: -10%;
+    left: -10%;
+    background: var(--aurora-a);
+    animation: auroraDriftA 24s ease-in-out infinite;
+}
+
+body::after {
+    bottom: -15%;
+    right: -10%;
+    background: var(--aurora-b);
+    animation: auroraDriftB 28s ease-in-out infinite;
 }
 
 @keyframes ambientGradient {
@@ -137,8 +196,25 @@ body {
     100% { background-position: 0% 0%; }
 }
 
+@keyframes auroraDriftA {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(8vw, 6vh) scale(1.15); }
+}
+
+@keyframes auroraDriftB {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-6vw, -8vh) scale(1.1); }
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
-    body {
+    body,
+    body::before,
+    body::after {
         animation: none;
     }
 }
@@ -482,17 +558,33 @@ button:hover {
 
 .current-weather {
     text-align: center;
-    margin-bottom: var(--space-8);
+    margin-bottom: var(--space-5);
     padding: var(--space-6) var(--space-4);
-    background-color: var(--secondary-bg);
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .location {
     font-size: var(--font-xl);
     font-weight: 600;
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-2);
+}
+
+.hero-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+}
+
+.hero-icon {
+    font-size: clamp(2.25rem, 8vw, 3.5rem);
+    color: var(--accent);
+    filter: drop-shadow(0 0 20px rgba(var(--accent-rgb), 0.35));
 }
 
 .temperature-container {
@@ -500,7 +592,6 @@ button:hover {
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1;
-    margin-bottom: var(--space-4);
     cursor: pointer;
     transition: opacity 0.2s;
 }
@@ -510,30 +601,160 @@ button:hover {
 }
 
 .weather-description {
-    font-size: 1.2rem;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 1.15rem;
     color: var(--text-secondary);
+    margin-top: var(--space-2);
 }
+
+.condition {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.condition::after {
+    content: '·';
+    margin-left: 0.5rem;
+    opacity: 0.5;
+}
+
+.feels-like {
+    font-size: 0.95rem;
+    opacity: 0.85;
+}
+
+.hilo-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+}
+
+.hilo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.hilo-high i { color: #ff9f43; }
+.hilo-low i { color: #4fa8ff; }
+.hilo-sep { opacity: 0.4; }
 
 .weather-details {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
-    margin-bottom: 3rem;
+    margin-bottom: var(--space-6);
+}
+
+/* Hourly forecast strip */
+.hourly-strip-section {
+    margin-bottom: var(--space-6);
+}
+
+.section-label {
+    font-size: var(--font-sm);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-3);
+    padding-left: var(--space-1);
+}
+
+.hourly-strip {
+    display: flex;
+    gap: var(--space-3);
+    overflow-x: auto;
+    padding: var(--space-1) var(--space-1) var(--space-3);
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hourly-strip::-webkit-scrollbar {
+    height: 6px;
+}
+
+.hourly-strip::-webkit-scrollbar-thumb {
+    background-color: var(--accent);
+    border-radius: var(--radius-pill);
+}
+
+.hour-card {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+    min-width: 68px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-2);
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: transform 0.2s ease;
+}
+
+.hour-card:hover {
+    transform: translateY(-2px);
+}
+
+.hour-time {
+    font-size: var(--font-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.hour-card i {
+    font-size: 1.1rem;
+    color: var(--accent);
+}
+
+.hour-temp {
+    font-size: var(--font-md);
+    font-weight: 700;
+}
+
+.hour-precip {
+    font-size: var(--font-xs);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    min-height: 1em;
 }
 
 .detail-item {
-    background-color: var(--secondary-bg);
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
     padding: 1.5rem;
     border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    transition: transform 0.2s;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .detail-item:hover {
     transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .detail-item i {
@@ -654,11 +875,7 @@ button:hover {
     .container {
         padding: 1rem;
     }
-    
-    .temperature-container {
-        font-size: 3rem;
-    }
-    
+
     .weather-details {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -672,15 +889,19 @@ button:hover {
 }
 
 .detail-card {
-    background-color: var(--secondary-bg);
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
     border-radius: var(--radius-md);
     padding: 1.5rem;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-sm);
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .detail-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
 }
 
 .card-header {
@@ -1144,24 +1365,37 @@ button:hover {
     }
 }
 
-/* Responsive typography */
-h1 {
-    font-size: clamp(1.5rem, 4vw, 2.5rem);
-}
-
-.temperature {
-    font-size: clamp(2rem, 6vw, 4rem);
-}
-
-.description {
-    font-size: clamp(1rem, 3vw, 1.25rem);
-}
 
 /* Mobile navigation */
 @media (max-width: 600px) {
+    /* Compact mobile controls: the header shouldn't dominate the viewport */
+    .app-logo {
+        margin-bottom: var(--space-4);
+    }
+
+    .logo-icon {
+        width: 48px;
+        height: 48px;
+        margin-bottom: var(--space-2);
+    }
+
+    .logo-text h1 {
+        font-size: 1.5rem;
+    }
+
+    .logo-text span {
+        font-size: 0.75rem;
+    }
+
+    header {
+        margin-bottom: var(--space-4);
+    }
+
     .top-bar {
         flex-direction: column;
         align-items: stretch;
+        gap: var(--space-2);
+        margin-bottom: var(--space-3);
     }
 
     .left-section {
@@ -1169,9 +1403,26 @@ h1 {
         width: 100%;
     }
 
+    .theme-btn span {
+        display: none;
+    }
+
+    .theme-btn {
+        padding: 0.5rem 0.65rem;
+    }
+
+    .current-time {
+        font-size: 1.1rem;
+    }
+
+    .current-date {
+        font-size: 0.8rem;
+    }
+
     .unit-toggle {
         width: 100%;
         justify-content: space-between;
+        padding: 0.4rem;
     }
 
     .theme-dropdown {
@@ -1284,12 +1535,16 @@ button,
 }
 
 .hourly-card {
-    background-color: var(--secondary-bg);
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-sm);
 }
 
 .hourly-card h3 {

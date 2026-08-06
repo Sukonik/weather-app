@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#1a1a1a">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
     <title>ClearSky Weather App</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -87,14 +88,27 @@
         <main>
             <div class="current-weather">
                 <h1 class="location">Loading...</h1>
-                <div class="temperature-container">
-                    <span class="temperature">--</span>
-                    <span class="unit">°C</span>
+                <div class="hero-main">
+                    <i id="weather-icon" class="fas fa-cloud hero-icon"></i>
+                    <div class="temperature-container">
+                        <span class="temperature">--</span>
+                        <span class="unit">°C</span>
+                    </div>
                 </div>
                 <div class="weather-description">
                     <span class="condition">--</span>
                     <span class="feels-like">Feels like: --°</span>
                 </div>
+                <div class="hilo-row">
+                    <span class="hilo hilo-high"><i class="fas fa-arrow-up"></i><span id="temp-high">--°</span></span>
+                    <span class="hilo-sep">·</span>
+                    <span class="hilo hilo-low"><i class="fas fa-arrow-down"></i><span id="temp-low">--°</span></span>
+                </div>
+            </div>
+
+            <div class="hourly-strip-section">
+                <h2 class="section-label">Hourly Forecast</h2>
+                <div class="hourly-strip" id="hourly-strip"></div>
             </div>
 
             <div class="weather-details">
@@ -145,54 +159,17 @@
                         <span class="label">Current Wind Speed</span>
                     </div>
                     <canvas id="windCanvas" width="300" height="200"></canvas>
+                    <div class="wind-legend">
+                        <span class="legend-item">Light</span>
+                        <span class="legend-item">Moderate</span>
+                        <span class="legend-item">Strong</span>
+                    </div>
                     <div class="time-display">
                         <span id="wind-time">--:-- --</span>
                     </div>
                     <div class="time-controls">
                         <button id="wind-current" class="time-btn active">Current Hour</button>
                         <button id="wind-forecast" class="time-btn">Next 8 Hours</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="large-cards">
-                <div class="large-card precipitation-large-card">
-                    <div class="card-header">
-                        <i class="fas fa-cloud-rain"></i>
-                        <span>HOURLY PRECIPITATION</span>
-                    </div>
-                    <div class="card-content">
-                        <div class="current-precipitation">
-                            <div class="card-value" id="precipitation-chance-large">--%</div>
-                            <div class="card-description">Chance of Rain</div>
-                        </div>
-                        <canvas id="precipitation-canvas"></canvas>
-                        <div class="visualization-controls">
-                            <button id="prev-hour" class="control-btn"><i class="fas fa-chevron-left"></i></button>
-                            <span id="time-display">Now</span>
-                            <button id="next-hour" class="control-btn"><i class="fas fa-chevron-right"></i></button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="large-card wind-large-card">
-                    <div class="card-header">
-                        <i class="fas fa-wind"></i>
-                        <span>HOURLY WIND</span>
-                    </div>
-                    <div class="card-content">
-                        <div class="current-wind">
-                            <div class="card-value" id="wind-speed-large">-- km/h</div>
-                            <div class="card-description">Current Wind Speed</div>
-                        </div>
-                        <canvas id="wind-canvas"></canvas>
-                        <div class="visualization-controls">
-                            <div class="wind-legend">
-                                <span class="legend-item">Light</span>
-                                <span class="legend-item">Moderate</span>
-                                <span class="legend-item">Strong</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
