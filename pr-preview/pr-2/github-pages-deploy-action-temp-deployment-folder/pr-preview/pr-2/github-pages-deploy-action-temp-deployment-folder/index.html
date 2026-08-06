@@ -2,11 +2,10 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#1a1a1a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
     <title>ClearSky Weather App</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -37,28 +36,34 @@
                         </button>
                         <div class="theme-dropdown">
                             <button class="theme-option" data-theme="dark">
-                                <i class="fas fa-moon"></i> Dark
+                                <i class="fas fa-moon"></i>
+                                Dark
                             </button>
                             <button class="theme-option" data-theme="light">
-                                <i class="fas fa-sun"></i> Light
+                                <i class="fas fa-sun"></i>
+                                Light
                             </button>
                             <button class="theme-option" data-theme="ocean">
-                                <i class="fas fa-water"></i> Ocean
+                                <i class="fas fa-water"></i>
+                                Ocean
                             </button>
                             <button class="theme-option" data-theme="jungle">
-                                <i class="fas fa-leaf"></i> Jungle
+                                <i class="fas fa-leaf"></i>
+                                Jungle
                             </button>
                             <button class="theme-option" data-theme="sunset">
-                                <i class="fas fa-cloud-sun"></i> Sunset
+                                <i class="fas fa-sun fa-fade"></i>
+                                Sunset
                             </button>
                             <button class="theme-option" data-theme="coffee">
-                                <i class="fas fa-mug-hot"></i> Coffee
+                                <i class="fas fa-coffee"></i>
+                                Coffee
                             </button>
                         </div>
                     </div>
                     <div class="current-datetime">
-                        <span class="current-time">--:-- --</span>
-                        <span class="current-date">---, --- --</span>
+                        <span class="current-time"></span>
+                        <span class="current-date"></span>
                     </div>
                 </div>
                 <div class="unit-toggle">
@@ -87,28 +92,15 @@
 
         <main>
             <div class="current-weather">
-                <h1 class="location">Loading...</h1>
-                <div class="hero-main">
-                    <i id="weather-icon" class="fas fa-cloud hero-icon"></i>
-                    <div class="temperature-container">
-                        <span class="temperature">--</span>
-                        <span class="unit">°C</span>
-                    </div>
+                <h1 class="location"></h1>
+                <div class="temperature-container">
+                    <span class="temperature">--</span>
+                    <span class="unit">°C</span>
                 </div>
                 <div class="weather-description">
                     <span class="condition">--</span>
                     <span class="feels-like">Feels like: --°</span>
                 </div>
-                <div class="hilo-row">
-                    <span class="hilo hilo-high"><i class="fas fa-arrow-up"></i><span id="temp-high">--°</span></span>
-                    <span class="hilo-sep">·</span>
-                    <span class="hilo hilo-low"><i class="fas fa-arrow-down"></i><span id="temp-low">--°</span></span>
-                </div>
-            </div>
-
-            <div class="hourly-strip-section">
-                <h2 class="section-label">Hourly Forecast</h2>
-                <div class="hourly-strip" id="hourly-strip"></div>
             </div>
 
             <div class="weather-details">
@@ -130,7 +122,17 @@
                 <div class="detail-item">
                     <i class="fas fa-sun"></i>
                     <span class="label">UV Index</span>
-                    <span class="value" id="uv-index">--</span>
+                    <div class="value-container" id="uv-index">--</div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-eye"></i>
+                    <span class="label">Visibility</span>
+                    <div class="value-container" id="visibility">--</div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-lungs"></i>
+                    <span class="label">Air Quality</span>
+                    <div class="value-container" id="air-quality">--</div>
                 </div>
             </div>
 
@@ -159,11 +161,6 @@
                         <span class="label">Current Wind Speed</span>
                     </div>
                     <canvas id="windCanvas" width="300" height="200"></canvas>
-                    <div class="wind-legend">
-                        <span class="legend-item">Light</span>
-                        <span class="legend-item">Moderate</span>
-                        <span class="legend-item">Strong</span>
-                    </div>
                     <div class="time-display">
                         <span id="wind-time">--:-- --</span>
                     </div>
@@ -174,16 +171,18 @@
                 </div>
             </div>
 
-            <div class="detailed-cards">
-                <div class="detail-card precipitation-card">
-                    <div class="card-header">
-                        <i class="fas fa-cloud-rain"></i>
-                        <span>PRECIPITATION</span>
+            <div class="hourly-forecast">
+                <div class="section-header">
+                    <h2>Hourly Forecast</h2>
+                    <div class="hour-controls">
+                        <button id="prev-hour" class="hour-btn"><i class="fas fa-chevron-left"></i></button>
+                        <button id="next-hour" class="hour-btn"><i class="fas fa-chevron-right"></i></button>
                     </div>
-                    <div class="card-value" id="precipitation-chance">--%</div>
-                    <div class="card-description" id="precipitation-desc">--</div>
                 </div>
+                <div id="forecast-rows" class="forecast-grid"></div>
+            </div>
 
+            <div class="detailed-cards">
                 <div class="detail-card air-quality-card">
                     <div class="card-header">
                         <button class="info-btn" id="aqi-info-btn">
@@ -196,46 +195,6 @@
                     <div class="card-description">US AQI</div>
                     <div class="card-status" id="air-quality-status">--</div>
                     <div class="card-pollutants" id="air-quality-pollutants"></div>
-                </div>
-
-                <!-- Air Quality Info Modal -->
-                <div class="modal" id="aqi-info-modal">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h3>🌫️ Air Pollutant Quick Guide</h3>
-                            <button class="close-btn">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="pollutant-guide">
-                                <div class="guide-item">
-                                    <h4>PM2.5 – 🛻🔥 (combustion)</h4>
-                                    <p>Fine particles from exhaust, smoke, wildfires. Affects lungs & heart.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>PM10 – 🌾💨 (dust & pollen)</h4>
-                                    <p>Coarse particles like dust, mold, and pollen. Irritates airways.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>Ozone (O₃) – ☀️🏙️ (sun + smog)</h4>
-                                    <p>Forms in sunlight. Irritates lungs, especially during summer.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>NO₂ – 🚗💨 (traffic fumes)</h4>
-                                    <p>From car engines and power plants. Worsens asthma.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>SO₂ – 🏭⚠️ (industrial gas)</h4>
-                                    <p>Burning coal/oil. Triggers coughing and breathing trouble.</p>
-                                </div>
-                                <div class="guide-item">
-                                    <h4>CO – 🔥🫁 (incomplete burning)</h4>
-                                    <p>From cars, stoves, and heaters. Blocks oxygen to the body.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="detail-card uv-card">
@@ -259,6 +218,47 @@
             </div>
         </main>
     </div>
+
+    <!-- Air Quality Info Modal -->
+    <div class="modal" id="aqi-info-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🌫️ Air Pollutant Quick Guide</h3>
+                <button class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="pollutant-guide">
+                    <div class="guide-item">
+                        <h4>PM2.5 – 🛻�� (combustion)</h4>
+                        <p>Fine particles from exhaust, smoke, wildfires. Affects lungs & heart.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>PM10 – 🌾💨 (dust & pollen)</h4>
+                        <p>Coarse particles like dust, mold, and pollen. Irritates airways.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>Ozone (O₃) – ☀️🏙️ (sun + smog)</h4>
+                        <p>Forms in sunlight. Irritates lungs, especially during summer.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>NO₂ – 🚗💨 (traffic fumes)</h4>
+                        <p>From car engines and power plants. Worsens asthma.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>SO₂ – 🏭⚠️ (industrial gas)</h4>
+                        <p>Burning coal/oil. Triggers coughing and breathing trouble.</p>
+                    </div>
+                    <div class="guide-item">
+                        <h4>CO – 🔥🫁 (incomplete burning)</h4>
+                        <p>From cars, stoves, and heaters. Blocks oxygen to the body.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="script.js"></script>
 </body>
 </html>
