@@ -353,90 +353,8 @@ header {
     gap: var(--space-4);
 }
 
-.right-section {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-}
-
 .theme-selector {
     position: relative;
-}
-
-/* Top-right nav menu — compact dropdown, mirrors .theme-dropdown's pattern
-   so it never overlaps other controls at narrow widths. */
-.nav-menu {
-    position: relative;
-}
-
-.nav-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background-color: var(--secondary-bg);
-    color: var(--text-primary);
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    border: none;
-    transition: background-color 0.2s;
-}
-
-.nav-btn:hover {
-    background-color: var(--hover-bg);
-}
-
-.nav-dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: 0.5rem;
-    background: var(--card-surface);
-    border: 1px solid var(--card-border);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: var(--radius-sm);
-    padding: 0.5rem;
-    display: none;
-    flex-direction: column;
-    z-index: 1000;
-    min-width: 190px;
-    box-shadow: var(--shadow-md);
-}
-
-.nav-dropdown.active {
-    display: flex;
-}
-
-.nav-link {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    background: none;
-    border: none;
-    color: var(--text-primary);
-    text-decoration: none;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-sm);
-    transition: background-color 0.2s;
-}
-
-.nav-link:hover {
-    background-color: var(--hover-bg);
-}
-
-.nav-link.active {
-    background-color: var(--accent);
-    color: white;
-}
-
-.nav-link i {
-    width: 1.1em;
-    text-align: center;
-    opacity: 0.85;
 }
 
 .theme-btn {
@@ -514,6 +432,12 @@ header {
     font-size: 1rem;
 }
 
+.chrome-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
 .unit-toggle {
     display: flex;
     align-items: center;
@@ -521,6 +445,317 @@ header {
     padding: 0.5rem;
     border-radius: var(--radius-sm);
     gap: 1rem;
+}
+
+/* Top-right nav menu */
+.nav-selector {
+    position: relative;
+}
+
+.nav-btn {
+    padding: 0.5rem 0.75rem;
+}
+
+.nav-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    display: none;
+    z-index: 1000;
+    min-width: 190px;
+    box-shadow: var(--shadow-md);
+}
+
+.nav-dropdown.active {
+    display: block;
+}
+
+.nav-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-sm);
+    transition: background-color 0.2s;
+}
+
+.nav-option:hover {
+    background-color: var(--hover-bg);
+}
+
+.nav-option.active {
+    background-color: var(--accent);
+    color: white;
+}
+
+.nav-option i {
+    width: 1.1rem;
+    text-align: center;
+}
+
+/* Quick locations + location summary */
+.quick-locations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: center;
+    margin-top: var(--space-3);
+}
+
+.quick-loc-btn {
+    padding: 0.4rem 0.9rem;
+    font-size: var(--font-xs);
+    font-weight: 600;
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.quick-loc-btn:hover {
+    color: var(--text-primary);
+    opacity: 1;
+}
+
+.location-summary {
+    text-align: center;
+    margin-top: var(--space-2);
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    min-height: 1.2em;
+}
+
+.location-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.location-picker-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--secondary-bg);
+    border: none;
+    cursor: pointer;
+}
+
+/* Data source / timestamp footer */
+.data-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-6);
+    padding: var(--space-3);
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+.data-footer-sep {
+    opacity: 0.5;
+}
+
+/* Safety net: "Data unavailable" and other longer fallback strings must wrap
+   instead of overflowing their card and causing horizontal page scroll. */
+.card-value,
+.page-hero-value,
+.page-hero-status,
+.hour-precip {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Shared secondary-page layout (Tides / AQI / Wind / Rain / UV / Moon) */
+.page-hero {
+    text-align: center;
+    padding: var(--space-6) var(--space-4);
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    margin-bottom: var(--space-5);
+}
+
+.page-hero-value {
+    font-size: clamp(2.5rem, 10vw, 4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: var(--space-3) 0;
+}
+
+.page-hero-status {
+    font-size: var(--font-lg);
+    font-weight: 600;
+    color: var(--text-secondary);
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.page-hero-sub {
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    margin-top: var(--space-2);
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+}
+
+/* Secondary-page stat cards often hold longer compound strings ("6.0 s /
+   180°", "Data unavailable") rather than the Overview's short numbers —
+   give them a smaller card-value size so they wrap gracefully at 2 columns
+   instead of breaking mid-word. */
+.stat-grid .card-value {
+    font-size: 1.35rem;
+    line-height: 1.3;
+}
+
+.card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+
+.card-header-row h3 {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+
+/* Wind compass */
+.wind-hero-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-5);
+    flex-wrap: wrap;
+}
+
+.compass {
+    position: relative;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: 2px solid var(--card-border);
+    background: var(--secondary-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.compass-arrow {
+    font-size: 2rem;
+    color: var(--accent);
+    transition: transform 0.4s ease;
+}
+
+.wind-hero-values {
+    text-align: left;
+}
+
+.wind-hero-values .page-hero-value {
+    margin: 0;
+    font-size: clamp(2rem, 6vw, 2.75rem);
+}
+
+/* Precip outlook rows */
+.daily-outlook,
+.moon-phases-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.outlook-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-3);
+    background: var(--hover-bg);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-sm);
+}
+
+.outlook-day {
+    font-weight: 600;
+}
+
+.outlook-prob {
+    color: var(--accent);
+}
+
+.outlook-sum {
+    color: var(--text-secondary);
+}
+
+/* Moon */
+.moon-icon {
+    font-size: 3.5rem;
+    line-height: 1;
+}
+
+/* UV safety card */
+.uv-safety-card {
+    text-align: center;
+}
+
+.uv-safety-card p {
+    margin-top: var(--space-2);
+    line-height: 1.5;
+}
+
+/* Tide warnings */
+.modeled-warning,
+.inland-message {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--font-sm);
+    margin-bottom: var(--space-5);
+}
+
+.modeled-warning {
+    background: rgba(255, 159, 67, 0.12);
+    border: 1px solid rgba(255, 159, 67, 0.3);
+    color: #ff9f43;
+}
+
+.inland-message {
+    background: var(--card-surface);
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    justify-content: center;
+    text-align: center;
+}
+
+.more-conditions {
+    margin-top: var(--space-4);
 }
 
 .temp-units,
@@ -624,71 +859,6 @@ input[type="text"] {
     color: var(--text-secondary);
 }
 
-.suggestion-header {
-    padding: 0.5rem 1rem 0.25rem;
-    font-size: var(--font-xs);
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-}
-
-.loc-badge {
-    display: inline-block;
-    margin-left: 0.5rem;
-    padding: 0.05rem 0.5rem;
-    font-size: var(--font-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--accent);
-    background: rgba(var(--accent-rgb), 0.15);
-    border-radius: var(--radius-pill);
-    vertical-align: middle;
-}
-
-.quick-locations {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    max-width: 600px;
-    margin: var(--space-2) auto 0;
-}
-
-.quick-locations-label {
-    font-size: var(--font-xs);
-    color: var(--text-secondary);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.quick-loc-btn {
-    background: var(--card-surface);
-    border: 1px solid var(--card-border);
-    color: var(--text-primary);
-    padding: 0.35rem 0.75rem;
-    font-size: var(--font-xs);
-    font-weight: 600;
-    border-radius: var(--radius-pill);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-}
-
-.quick-loc-btn:hover {
-    background: var(--hover-bg);
-}
-
-/* Genuinely-missing data (source failed / field not returned) — visually
-   distinct from the pre-load "--" skeleton, and never a bare 0. */
-.unavailable {
-    font-size: 0.8em;
-    font-style: italic;
-    font-weight: 500;
-    color: var(--text-secondary);
-    opacity: 0.75;
-}
-
 button {
     padding: 0.8rem 1rem;
     border: none;
@@ -718,20 +888,7 @@ button:hover {
 .location {
     font-size: var(--font-xl);
     font-weight: 600;
-    margin-bottom: var(--space-1);
-}
-
-.current-weather .location-detail {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--space-3);
-}
-
-.data-meta {
-    margin-top: var(--space-4);
-    font-size: var(--font-xs);
-    color: var(--text-secondary);
-    opacity: 0.75;
+    margin-bottom: var(--space-2);
 }
 
 .hero-main {
@@ -1579,10 +1736,9 @@ button:hover {
         font-size: 0.8rem;
     }
 
-    .right-section {
+    .chrome-right {
         width: 100%;
         justify-content: space-between;
-        gap: var(--space-2);
     }
 
     .unit-toggle {
@@ -1597,24 +1753,17 @@ button:hover {
         min-width: 180px;
     }
 
-    .nav-btn span {
-        display: none;
-    }
-
-    .nav-btn {
-        padding: 0.5rem 0.65rem;
-    }
-
     .nav-dropdown {
         right: 0;
         left: auto;
-        min-width: 200px;
-        max-height: 70vh;
-        overflow-y: auto;
     }
 
     .quick-locations {
-        flex-wrap: wrap;
+        justify-content: stretch;
+    }
+
+    .quick-loc-btn {
+        flex: 1;
     }
 
     .search-container {
@@ -1880,86 +2029,4 @@ canvas {
 
 .error-message:not(:empty) {
     display: block;
-}
-
-/* Read-only location badge shown on the six secondary pages */
-.active-location-badge {
-    text-align: center;
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-top: var(--space-2);
-}
-
-.active-location-badge i {
-    color: var(--accent);
-    margin-right: 0.35rem;
-}
-
-.active-location-badge a {
-    color: var(--accent);
-    text-decoration: none;
-    margin-left: 0.35rem;
-}
-
-.active-location-badge a:hover {
-    text-decoration: underline;
-}
-
-/* "Coming soon" stub pages (Tides / AQI / Wind / Rain / UV / Moon) */
-.stub-page {
-    max-width: 560px;
-    margin: var(--space-8) auto;
-    padding: var(--space-8) var(--space-6);
-    text-align: center;
-    background: var(--card-surface);
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-lg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: var(--shadow-md);
-}
-
-.stub-icon {
-    font-size: 2.75rem;
-    color: var(--accent);
-    margin-bottom: var(--space-4);
-    filter: drop-shadow(0 0 20px rgba(var(--accent-rgb), 0.35));
-}
-
-.stub-title {
-    font-size: var(--font-xl);
-    font-weight: 700;
-    margin-bottom: var(--space-2);
-}
-
-.stub-blurb {
-    color: var(--text-secondary);
-    margin-bottom: var(--space-4);
-}
-
-.stub-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: var(--hover-bg);
-    border-radius: var(--radius-pill);
-    font-size: var(--font-sm);
-    font-weight: 600;
-    color: var(--accent);
-    margin-bottom: var(--space-4);
-}
-
-.stub-sources {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--space-5);
-}
-
-.stub-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: var(--radius-pill);
 }

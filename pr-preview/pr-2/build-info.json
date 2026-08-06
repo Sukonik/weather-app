@@ -1,0 +1,7 @@
+{
+  "sourceBranch": "claude/clearsky-mobile-responsive-0kpe12",
+  "commitSha": "20169616809c495938ec1e233cf887625af586fa",
+  "deployedAt": "2026-08-06T19:46:10Z",
+  "previewPath": "/pr-preview/pr-2/",
+  "deployMethod": "manual-direct (GitHub Actions runner allocation was stuck queued)"
+}
