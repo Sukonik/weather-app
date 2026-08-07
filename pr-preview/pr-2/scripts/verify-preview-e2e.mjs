@@ -61,12 +61,27 @@ async function withBrowser(fn) {
     }
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function main() {
     let failures = 0;
 
     log('# ClearSky Live Preview E2E Verification\n');
     log(`Preview URL: ${PREVIEW_URL}`);
     log(`Expected commit: ${EXPECTED_SHA || '(not checked)'}\n`);
+
+    // verify-data-sources.mjs (run immediately before this script, in the
+    // same CI job) fires ~10 geocoding requests back-to-back from this
+    // runner's IP. Every CI run so far shows the exact same shape: the
+    // FIRST geocoding search this script itself makes always succeeds in
+    // a few seconds, and the NEXT one always hangs indefinitely — no
+    // error, no abort, no response, just silence past this script's own
+    // generous timeouts. That's not something our own retry/abort logic
+    // can distinguish from a real outage; it reads as upstream throttling
+    // of a free, keyless public API reacting to a burst of requests from
+    // one IP. Give it room to cool down before this script adds to that
+    // burst, and again between the additional searches below.
+    await sleep(8000);
 
     // 1. build-info.json matches expected commit
     failures += await withBrowser(async (browser) => {
@@ -130,6 +145,7 @@ async function main() {
     // own fresh browser (see withBrowser).
     for (const query of QUERIES) {
         log(`\n## Journey: search "${query}" then visit all 7 pages via nav`);
+        await sleep(6000); // space out geocoding calls — see note at top of main()
         failures += await withBrowser(async (browser) => {
             let page;
             const consoleErrors = [];
@@ -208,6 +224,7 @@ async function main() {
     // Each gets its own fresh browser too, for the same reason as above.
     log('\n## Theme + tide-chart interaction screenshots');
     for (const theme of ['coffee', 'light']) {
+        await sleep(6000); // space out geocoding calls — see note at top of main()
         failures += await withBrowser(async (browser) => {
             try {
                 const page = await browser.newPage();
@@ -232,6 +249,7 @@ async function main() {
         });
     }
 
+    await sleep(6000); // space out geocoding calls — see note at top of main()
     failures += await withBrowser(async (browser) => {
         try {
             const page = await browser.newPage();

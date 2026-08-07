@@ -1,6 +1,6 @@
 import { initChrome, onLocationChange } from '../modules/chrome.js';
 import { fetchJSON, cacheGet, cacheSet, formatUpdatedTime, makeAbortGroup } from '../modules/fetchUtils.js';
-import { getAirQualityDescription, getAirQualityColor, getAirQualityImplication } from '../modules/utils.js';
+import { getAirQualityDescription, getAQISeverityClass, getAirQualityImplication } from '../modules/utils.js';
 import { drawHourlyChart } from '../modules/visualization.js';
 
 const UNAVAILABLE = 'Data unavailable';
@@ -41,8 +41,10 @@ function initApp() {
     function render(data) {
         const c = data.current || {};
         const aqi = c.us_aqi;
-        document.getElementById('aqi-page-value').textContent = aqi ?? '—';
-        document.getElementById('aqi-page-value').style.color = aqi != null ? getAirQualityColor(aqi) : '';
+        const aqiValueEl = document.getElementById('aqi-page-value');
+        aqiValueEl.textContent = aqi ?? '—';
+        aqiValueEl.classList.remove('sev-1', 'sev-2', 'sev-3', 'sev-4', 'sev-5', 'sev-6');
+        if (aqi != null) aqiValueEl.classList.add(getAQISeverityClass(aqi));
         document.getElementById('aqi-page-status').textContent = aqi != null ? `${getAirQualityDescription(aqi)} — ${getAirQualityImplication(aqi)}` : UNAVAILABLE;
         document.getElementById('aqi-eu-value').textContent = c.european_aqi != null ? `European AQI: ${c.european_aqi}` : 'European AQI: unavailable';
 
