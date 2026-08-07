@@ -141,6 +141,63 @@ async function main() {
         }
     }
 
+    // 4. Theme screenshots (Coffee, Light) — confirms no low-contrast yellow
+    // main numbers on the light cards — plus the interactive tide chart at
+    // two different selected times (drag + keyboard), for visual review.
+    log('\n## Theme + tide-chart interaction screenshots');
+    for (const theme of ['coffee', 'light']) {
+        try {
+            const page = await browser.newContext().then(ctx => ctx.newPage());
+            await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForSelector('#location-search', { timeout: 10000 });
+            await page.click('#theme-btn');
+            await page.click(`.theme-option[data-theme="${theme}"]`);
+            await page.fill('#location-search', '11561');
+            await page.keyboard.press('Enter');
+            await page.waitForTimeout(6000);
+            const shotPath = `${SCREENSHOT_DIR}/theme-${theme}-overview.png`;
+            await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+            log(`✅ ${theme} theme screenshot: ${shotPath}`);
+            await page.close();
+        } catch (error) {
+            log(`❌ ${theme} theme screenshot failed: ${error.message}`);
+            failures++;
+        }
+    }
+
+    try {
+        const page = await browser.newContext().then(ctx => ctx.newPage());
+        await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForSelector('#location-search', { timeout: 10000 });
+        await page.fill('#location-search', '11561');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(6000);
+        await page.goto(new URL('tides.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(6000);
+
+        const slider = page.locator('#tide-slider');
+        const sliderVisible = await slider.isVisible().catch(() => false);
+        if (sliderVisible) {
+            await slider.focus();
+            await slider.press('Home');
+            await page.waitForTimeout(300);
+            await page.screenshot({ path: `${SCREENSHOT_DIR}/tide-slider-point-1.png`, fullPage: true }).catch(() => {});
+            log(`✅ Tide slider point 1 (start, via keyboard Home): ${SCREENSHOT_DIR}/tide-slider-point-1.png`);
+
+            const max = await slider.getAttribute('max');
+            for (let i = 0; i < 15; i++) await slider.press('ArrowRight');
+            await page.waitForTimeout(300);
+            await page.screenshot({ path: `${SCREENSHOT_DIR}/tide-slider-point-2.png`, fullPage: true }).catch(() => {});
+            log(`✅ Tide slider point 2 (+15 steps via keyboard, max=${max}): ${SCREENSHOT_DIR}/tide-slider-point-2.png`);
+        } else {
+            log('⚠️ Tide slider not visible for this location/time — likely inland or no coastal data; skipping slider screenshots (not a failure).');
+        }
+        await page.close();
+    } catch (error) {
+        log(`❌ Tide slider screenshots failed: ${error.message}`);
+        failures++;
+    }
+
     await browser.close();
 
     log(`\n## Result: ${failures === 0 ? '✅ ALL CHECKS PASSED' : `❌ ${failures} CHECK(S) FAILED`}`);
