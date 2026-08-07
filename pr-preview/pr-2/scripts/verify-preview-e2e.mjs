@@ -94,8 +94,15 @@ async function main() {
     for (const query of QUERIES) {
         log(`\n## Journey: search "${query}" then visit all 7 pages via nav`);
         let page;
+        const consoleErrors = [];
+        const failedRequests = [];
         try {
             page = await browser.newContext().then(ctx => ctx.newPage());
+            page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
+            page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`));
+            page.on('requestfailed', req => failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`));
+            page.on('response', res => { if (!res.ok() && (res.url().includes('geocoding') || res.url().includes('open-meteo'))) failedRequests.push(`HTTP ${res.status()} ${res.url()}`); });
+
             await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
             await page.waitForSelector('#location-search', { timeout: 10000 });
 
@@ -110,7 +117,7 @@ async function main() {
             // Wait for the location to actually resolve before navigating —
             // a fixed sleep can fire while the geocoding fetch is still
             // in-flight, and the subsequent nav-click cancels it.
-            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, { timeout: 15000 });
+            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 15000 });
             await page.waitForTimeout(2000); // let the weather/AQI fetches that location-selection kicks off get underway
 
             for (const p of PAGES) {
@@ -140,6 +147,10 @@ async function main() {
             await page.close();
         } catch (error) {
             log(`❌ Journey for "${query}" failed: ${error.message}`);
+            if (consoleErrors.length) log('Browser console errors:\n```\n' + consoleErrors.slice(0, 20).join('\n') + '\n```');
+            if (failedRequests.length) log('Failed/error API requests (geocoding/Open-Meteo):\n```\n' + failedRequests.slice(0, 20).join('\n') + '\n```');
+            const errorBannerText = await page?.locator('#error').innerText().catch(() => '(unavailable)');
+            log(`Error banner text: "${errorBannerText}"`);
             failures++;
             await page?.close().catch(() => {});
         }
@@ -186,7 +197,7 @@ async function main() {
         // navigating away while the geocoding fetch is still in-flight
         // would have the browser cancel it (net::ERR_ABORTED) before the
         // selection is saved, which is a test race, not a product bug.
-        await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, { timeout: 15000 });
+        await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 15000 });
         await page.waitForTimeout(1000); // let localStorage write settle
         await page.goto(new URL('tides.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(10000);
