@@ -4,7 +4,22 @@
 // keyboard, and reports every selection change through onSelect() so the
 // page can render a "selected point" panel and announce it to screen
 // readers.
-import { getThemeColor } from './visualization.js';
+import { getThemeColor, fitCanvasToDisplaySize } from './visualization.js';
+
+/** Smooths a polyline through real points via quadratic curves between
+ * midpoints — purely a rendering treatment; the underlying values shown
+ * in labels/markers/the selected-point panel are always the exact ones. */
+function smoothPath(ctx, points) {
+    if (points.length < 2) return;
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i], p1 = points[i + 1];
+        const midX = (p0.x + p1.x) / 2, midY = (p0.y + p1.y) / 2;
+        ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x, last.y);
+}
 
 /**
  * @param {Object} opts
@@ -72,10 +87,19 @@ export function createTideChart(opts) {
     }
 
     function draw() {
+        const { width: w, height: h } = fitCanvasToDisplaySize(canvas);
         const ctx = canvas.getContext('2d');
-        const w = canvas.width, h = canvas.height;
         ctx.clearRect(0, 0, w, h);
-        if (!points.length) return;
+        if (!points.length) {
+            const labelColor = getThemeColor('--chart-label-color', 'rgba(255,255,255,0.6)');
+            ctx.fillStyle = labelColor;
+            ctx.globalAlpha = 0.7;
+            ctx.font = '500 13px Inter, Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('No tide data available', w / 2, h / 2);
+            ctx.globalAlpha = 1;
+            return;
+        }
 
         const values = points.map(p => p.value);
         const min = Math.min(...values, ...hiloPoints.map(p => p.value));
@@ -121,15 +145,28 @@ export function createTideChart(opts) {
         }
 
         // Curve — connects only real returned points; if the curve is
-        // sparse (hilo-only station), this still just draws straight
+        // sparse (hilo-only station), this still just draws smoothed
         // segments between real values, never fabricated ones.
+        const linePoints = points.map(p => ({ x: xFor(p.time), y: yFor(p.value) }));
+
+        // Soft gradient fill under the curve for visual depth.
+        const fillGradient = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+        fillGradient.addColorStop(0, cursorColor + '2e');
+        fillGradient.addColorStop(1, cursorColor + '00');
+        ctx.beginPath();
+        smoothPath(ctx, linePoints);
+        ctx.lineTo(linePoints[linePoints.length - 1].x, padT + chartH);
+        ctx.lineTo(linePoints[0].x, padT + chartH);
+        ctx.closePath();
+        ctx.fillStyle = fillGradient;
+        ctx.fill();
+
         ctx.strokeStyle = cursorColor;
         ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        points.forEach((p, i) => {
-            const x = xFor(p.time), y = yFor(p.value);
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        });
+        smoothPath(ctx, linePoints);
         ctx.stroke();
 
         // High/low markers
@@ -179,10 +216,12 @@ export function createTideChart(opts) {
     }
 
     function xToIndex(clientX) {
+        // Work in CSS pixels (rect.width) — canvas.width is the DPI-scaled
+        // drawing-buffer size, not the on-screen size, since fitCanvasToDisplaySize.
         const rect = canvas.getBoundingClientRect();
         const padL = 42, padR = 12;
-        const relX = ((clientX - rect.left) / rect.width) * canvas.width;
-        const chartW = canvas.width - padL - padR;
+        const relX = clientX - rect.left;
+        const chartW = rect.width - padL - padR;
         const frac = Math.max(0, Math.min(1, (relX - padL) / chartW));
         return Math.round(frac * (points.length - 1));
     }

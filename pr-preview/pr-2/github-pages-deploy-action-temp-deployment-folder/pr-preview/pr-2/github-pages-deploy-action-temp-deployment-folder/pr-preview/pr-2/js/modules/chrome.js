@@ -24,7 +24,17 @@ let state = {
     location: getLastLocation()
 };
 
+// Separate abort groups for the two independent request streams: live
+// as-you-type suggestions vs. an explicit search (Enter/button/quick-pick).
+// They used to share one group, which meant a suggestions fetch that was
+// still in flight when the user pressed Enter could abort the *real*
+// search request moments after it started (the debounce timer firing
+// after Enter, not before) — silently breaking the search with no
+// visible error. cancelPendingSuggestions() is also called before every
+// explicit search so no stray suggestions fetch is even in flight.
 const searchAbort = makeAbortGroup();
+const suggestAbort = makeAbortGroup();
+let cancelPendingSuggestions = () => {};
 const listeners = { locationchange: [] };
 let locationGeneration = 0; // bumped on every explicit location selection
 
@@ -202,6 +212,7 @@ function showPicker(root, candidates) {
 }
 
 async function runSearch(root, query) {
+    cancelPendingSuggestions();
     const errorBanner = document.getElementById('error');
     try {
         const signal = searchAbort();
@@ -227,13 +238,17 @@ function wireSearchSuggestions(root) {
     const input = root.querySelector('#location-search');
     const suggestions = root.querySelector('#search-suggestions');
     let debounce = null;
+    cancelPendingSuggestions = () => {
+        clearTimeout(debounce);
+        suggestAbort(); // abort any suggestions fetch already in flight
+    };
     input.addEventListener('input', () => {
         const q = input.value.trim();
         clearTimeout(debounce);
         if (q.length < 2) { suggestions.classList.remove('active'); return; }
         debounce = setTimeout(async () => {
             try {
-                const signal = searchAbort();
+                const signal = suggestAbort();
                 const results = await searchLocations(q, { signal });
                 if (!results.length) { suggestions.classList.remove('active'); return; }
                 suggestions.innerHTML = results.slice(0, 6).map((r, i) => `
