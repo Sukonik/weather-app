@@ -167,13 +167,27 @@ async function main() {
 
     try {
         const page = await browser.newContext().then(ctx => ctx.newPage());
+        const consoleErrors = [];
+        const failedRequests = [];
+        page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
+        page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`));
+        page.on('requestfailed', req => failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`));
+        page.on('response', res => { if (!res.ok() && (res.url().includes('noaa') || res.url().includes('open-meteo'))) failedRequests.push(`HTTP ${res.status()} ${res.url()}`); });
+
         await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForSelector('#location-search', { timeout: 10000 });
         await page.fill('#location-search', '11561');
         await page.keyboard.press('Enter');
         await page.waitForTimeout(6000);
         await page.goto(new URL('tides.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await page.waitForTimeout(6000);
+        await page.waitForTimeout(10000);
+
+        const tideStationInfo = await page.locator('#tide-station-info').innerText().catch(() => '(unavailable)');
+        const errorBanner = await page.locator('#error').innerText().catch(() => '');
+        log(`Tide station info text: "${tideStationInfo}"`);
+        if (errorBanner) log(`Error banner: "${errorBanner}"`);
+        if (consoleErrors.length) log('Browser console errors:\n```\n' + consoleErrors.slice(0, 20).join('\n') + '\n```');
+        if (failedRequests.length) log('Failed/error API requests (NOAA/Open-Meteo):\n```\n' + failedRequests.slice(0, 20).join('\n') + '\n```');
 
         const slider = page.locator('#tide-slider');
         const sliderVisible = await slider.isVisible().catch(() => false);
