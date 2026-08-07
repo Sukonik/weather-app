@@ -1,0 +1,107 @@
+name: PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to (re)deploy/verify (only needed when manually dispatching)'
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  # Shares one queue with deploy-main.yml (same group name) so a production
+  # deploy and any PR-preview publish never race writing to gh-pages at once.
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      commit_sha: ${{ steps.resolve.outputs.commit_sha }}
+      preview_url: ${{ steps.resolve.outputs.preview_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve PR number / commit / preview URL
+        id: resolve
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number || inputs.pr_number }}"
+          COMMIT_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          PREVIEW_URL="https://$(echo '${{ github.repository }}' | cut -d/ -f1).github.io/$(echo '${{ github.repository }}' | cut -d/ -f2)/pr-preview/pr-${PR_NUMBER}/"
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "preview_url=${PREVIEW_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Write deployment marker (build-info.json)
+        if: github.event.action != 'closed'
+        run: |
+          cat > build-info.json << EOF
+          {
+            "sourceBranch": "${{ github.head_ref || github.ref_name }}",
+            "commitSha": "${{ steps.resolve.outputs.commit_sha }}",
+            "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "previewPath": "/pr-preview/pr-${{ steps.resolve.outputs.pr_number }}/",
+            "workflowRunId": "${{ github.run_id }}"
+          }
+          EOF
+          cat build-info.json
+
+      - name: Deploy PR preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: ./
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+
+  verify:
+    needs: deploy-preview
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright (Chromium only)
+        run: npm install playwright@latest && npx playwright install --with-deps chromium
+
+      - name: Wait for GitHub Pages to serve the new deployment
+        run: |
+          URL="${{ needs.deploy-preview.outputs.preview_url }}build-info.json"
+          EXPECTED="${{ needs.deploy-preview.outputs.commit_sha }}"
+          echo "Polling $URL for commitSha=$EXPECTED"
+          for i in $(seq 1 20); do
+            BODY=$(curl -s "$URL?cachebust=$(date +%s)" || true)
+            if echo "$BODY" | grep -q "$EXPECTED"; then
+              echo "Preview is serving the expected commit."
+              exit 0
+            fi
+            echo "Attempt $i: not yet serving expected commit, waiting 15s..."
+            sleep 15
+          done
+          echo "::warning::Preview did not confirm the expected commit within the poll window; proceeding anyway so the e2e step's own build-info.json check can report the precise mismatch."
+
+      - name: Real-network field-completeness check (direct API calls)
+        run: node scripts/verify-data-sources.mjs
+
+      - name: Live preview end-to-end check (browser against deployed preview)
+        env:
+          PREVIEW_URL: ${{ needs.deploy-preview.outputs.preview_url }}
+          EXPECTED_SHA: ${{ needs.deploy-preview.outputs.commit_sha }}
+        run: node scripts/verify-preview-e2e.mjs
+
+      - name: Upload E2E screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-e2e-screenshots
+          path: e2e-screenshots/
+          retention-days: 14
