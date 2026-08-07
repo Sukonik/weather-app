@@ -8,27 +8,79 @@ export function getThemeColor(varName, fallback) {
     return v || fallback;
 }
 
-export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
+/**
+ * Sizes a canvas's drawing buffer to match its CSS/layout size × the
+ * device pixel ratio, then scales the context so drawing code can keep
+ * working in CSS pixels. Without this, a canvas with a fixed HTML
+ * width/height attribute (e.g. 600×220) gets stretched by its `width:100%`
+ * CSS rule and renders blurry on wide containers or retina screens.
+ * Returns {width, height} in CSS pixels for the caller to lay out against.
+ */
+export function fitCanvasToDisplaySize(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const cssWidth = Math.round(rect.width) || canvas.width;
+    const cssHeight = Math.round(rect.height) || canvas.height;
+    const targetW = Math.round(cssWidth * dpr);
+    const targetH = Math.round(cssHeight * dpr);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+    }
     const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { width: cssWidth, height: cssHeight };
+}
+
+/** Draws a smooth line through `points` (array of {x,y}) using quadratic
+ * curves between midpoints — a purely visual smoothing of the connection
+ * between real data points; it never adds or alters a labeled value. */
+function smoothLinePath(ctx, points) {
+    if (points.length < 2) {
+        if (points.length === 1) { ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[0].x, points[0].y); }
+        return;
+    }
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i], p1 = points[i + 1];
+        const midX = (p0.x + p1.x) / 2, midY = (p0.y + p1.y) / 2;
+        ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x, last.y);
+}
+
+export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
+    const { width, height } = fitCanvasToDisplaySize(canvas);
+    const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, width, height);
 
     const values = data.slice(startIndex, startIndex + count);
-    if (!values.length) return;
+    if (!values.length) {
+        const labelColor = options.labelColor || getThemeColor('--chart-label-color', 'rgba(255,255,255,0.65)');
+        ctx.fillStyle = labelColor;
+        ctx.globalAlpha = 0.7;
+        ctx.font = '500 13px Inter, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No data available', width / 2, height / 2);
+        ctx.globalAlpha = 1;
+        return;
+    }
 
-    const padding = 20;
+    const padding = 22;
     const chartWidth = width - (padding * 2);
     const chartHeight = height - (padding * 2);
 
     const labelColor = options.labelColor || getThemeColor('--chart-label-color', 'rgba(255,255,255,0.65)');
+    const lineColor = options.color || getThemeColor('--chart-cursor-color', '#007AFF');
 
-    // Draw background grid — theme-aware so it stays faint but visible on
-    // both dark cards and light ones (Coffee/Light).
+    // Background grid — theme-aware so it stays faint but visible on both
+    // dark cards and light ones (Coffee/Light).
     ctx.strokeStyle = labelColor;
-    ctx.globalAlpha = 0.25;
+    ctx.globalAlpha = 0.15;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let i = 0; i <= count; i++) {
+    for (let i = 0; i <= count; i += Math.max(1, Math.round(count / 6))) {
         const x = padding + (i * (chartWidth / count));
         ctx.moveTo(x, padding);
         ctx.lineTo(x, height - padding);
@@ -36,37 +88,47 @@ export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // Calculate scale
-    const maxValue = Math.max(...values) * 1.2;
+    // Scale
+    const maxValue = Math.max(...values) * 1.2 || 1;
     const scale = chartHeight / maxValue;
+    const points = values.map((v, i) => ({
+        x: padding + (i * (chartWidth / (count - 1 || 1))),
+        y: height - padding - (v * scale)
+    }));
 
-    // Draw data points
-    ctx.strokeStyle = options.color || getThemeColor('--chart-cursor-color', '#007AFF');
-    ctx.lineWidth = 2;
+    // Soft gradient fill under the curve for a bit of visual depth.
+    const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+    gradient.addColorStop(0, lineColor + '33');
+    gradient.addColorStop(1, lineColor + '00');
     ctx.beginPath();
-    values.forEach((value, i) => {
-        const x = padding + (i * (chartWidth / (count - 1)));
-        const y = height - padding - (value * scale);
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    });
+    smoothLinePath(ctx, points);
+    ctx.lineTo(points[points.length - 1].x, height - padding);
+    ctx.lineTo(points[0].x, height - padding);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // The line itself — smoothed, rounded joins/caps for a cleaner look.
+    ctx.beginPath();
+    smoothLinePath(ctx, points);
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.stroke();
 
-    // Draw current value label — theme-aware color so it's never invisible
+    // Current-value label — theme-aware color so it's never invisible
     // white-on-light (Coffee/Light) or dark-on-dark.
     const currentValue = values[0];
     ctx.fillStyle = labelColor;
     ctx.font = '600 14px Inter, Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(options.formatValue ? options.formatValue(currentValue) : currentValue, padding, padding - 5);
+    ctx.textAlign = 'left';
+    ctx.fillText(options.formatValue ? options.formatValue(currentValue) : currentValue, padding, padding - 6);
 }
 
 export function updateHourlyVisualizations(weatherData, currentHourIndex) {
     const hourCount = 12;
-    
+
     // Temperature
     const tempCanvas = document.getElementById('tempCanvas');
     if (tempCanvas) {
@@ -152,7 +214,7 @@ class WindParticle {
 export function initializeAnimations(precipCanvas, windCanvas) {
     const raindrops = Array.from({ length: 50 }, () => new RainDrop(precipCanvas));
     const windParticles = Array.from({ length: 100 }, () => new WindParticle(windCanvas));
-    
+
     return { raindrops, windParticles };
 }
 
@@ -174,10 +236,10 @@ export function updatePrecipitationDisplay(canvas, data, hourIndex, isNext8Hours
     // Update display values
     const probDisplay = document.getElementById('precip-probability');
     const timeDisplay = document.getElementById('precip-time');
-    
+
     probDisplay.textContent = `${currentProb}%`;
     const time = new Date(data.hourly.time[hourIndex]);
-    timeDisplay.textContent = time.toLocaleTimeString('en-US', { 
+    timeDisplay.textContent = time.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
@@ -209,7 +271,7 @@ export function updateWindDisplay(canvas, data, hourIndex, isNext8Hours = false)
     const speedDisplay = document.getElementById('wind-speed');
     const dirDisplay = document.getElementById('wind-direction');
     const timeDisplay = document.getElementById('wind-time');
-    
+
     speedDisplay.textContent = formatSpeed(currentSpeed, 'km/h');
     dirDisplay.textContent = getWindDirection(currentDir);
     const time = new Date(data.hourly.time[hourIndex]);
@@ -227,9 +289,9 @@ export function updateWindDisplay(canvas, data, hourIndex, isNext8Hours = false)
 
 export function animate(ctx, particles, weatherParams) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    
+
     particles.forEach(particle => {
         particle.update(weatherParams.intensity || weatherParams.speed);
         particle.draw(ctx);
     });
-} 
+}
