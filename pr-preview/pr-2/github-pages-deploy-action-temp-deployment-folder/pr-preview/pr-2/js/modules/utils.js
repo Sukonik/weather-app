@@ -94,19 +94,13 @@ export function getAirQualityImplication(aqi) {
     return 'Health alert: everyone may experience serious health effects.';
 }
 
-/**
- * Semantic severity class (sev-1 = good … sev-6 = hazardous) instead of a
- * hardcoded hex color. The actual color for each stop is a per-theme CSS
- * token (see styles.css), so a "moderate" reading never renders as
- * low-contrast pure yellow on a light card like Coffee.
- */
-export function getAQISeverityClass(aqi) {
-    if (aqi <= 50) return 'sev-1';    // Good
-    if (aqi <= 100) return 'sev-2';   // Moderate
-    if (aqi <= 150) return 'sev-3';   // Unhealthy for Sensitive Groups
-    if (aqi <= 200) return 'sev-4';   // Unhealthy
-    if (aqi <= 300) return 'sev-5';   // Very Unhealthy
-    return 'sev-6';                   // Hazardous
+export function getAirQualityColor(aqi) {
+    if (aqi <= 50) return '#00e400';  // Green
+    if (aqi <= 100) return '#ffff00';  // Yellow
+    if (aqi <= 150) return '#ff7e00';  // Orange
+    if (aqi <= 200) return '#ff0000';  // Red
+    if (aqi <= 300) return '#8f3f97';  // Purple
+    return '#7e0023';  // Maroon
 }
 
 export function getVisibilityDescription(visibility) {
@@ -125,26 +119,12 @@ export function getPrecipitationIntensity(intensity) {
     return 'Very Heavy';
 }
 
-export function getUVSeverityClass(uvIndex) {
-    if (uvIndex <= 2) return 'sev-1';   // Low
-    if (uvIndex <= 5) return 'sev-2';   // Moderate
-    if (uvIndex <= 7) return 'sev-3';   // High
-    if (uvIndex <= 10) return 'sev-5';  // Very High
-    return 'sev-6';                     // Extreme
-}
-
-export function convertLength(value, targetUnit, fromUnit) {
-    if (value == null || Number.isNaN(value)) return null;
-    if (fromUnit === targetUnit) return value;
-    // Canonical conversion via meters
-    const meters = fromUnit === 'ft' ? value * 0.3048 : value;
-    return targetUnit === 'ft' ? meters / 0.3048 : meters;
-}
-
-export function formatLength(value, targetUnit, fromUnit, decimals = 2) {
-    const converted = convertLength(value, targetUnit, fromUnit);
-    if (converted == null) return 'Data unavailable';
-    return `${converted.toFixed(decimals)} ${targetUnit}`;
+export function getUVColor(uvIndex) {
+    if (uvIndex <= 2) return '#3bb44a';   // Low - green
+    if (uvIndex <= 5) return '#f1c40f';   // Moderate - yellow
+    if (uvIndex <= 7) return '#ff8c00';   // High - orange
+    if (uvIndex <= 10) return '#e53935';  // Very High - red
+    return '#8e44ad';                     // Extreme - purple
 }
 
 export function getCloudCoverDescription(pct) {
