@@ -116,8 +116,14 @@ async function main() {
             await page.keyboard.press('Enter');
             // Wait for the location to actually resolve before navigating —
             // a fixed sleep can fire while the geocoding fetch is still
-            // in-flight, and the subsequent nav-click cancels it.
-            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 15000 });
+            // in-flight, and the subsequent nav-click cancels it. The app's
+            // own fetchWithTimeout gives a request up to ~8s, then retries
+            // once more (another ~8s + backoff) before giving up, so the
+            // real-world worst case is ~16-17s on a slow/flaky network —
+            // the wait here must comfortably exceed that, not just the
+            // happy-path latency, or this is a test-patience failure dressed
+            // up as a product bug.
+            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
             await page.waitForTimeout(2000); // let the weather/AQI fetches that location-selection kicks off get underway
 
             for (const p of PAGES) {
@@ -125,7 +131,17 @@ async function main() {
                     await page.click('#nav-btn');
                     await page.click(`.nav-option[href="${p.file}"]`);
                     await page.waitForLoadState('domcontentloaded');
-                    await page.waitForTimeout(4000);
+                    // Give the page's data fetch (which can itself involve an
+                    // 8s-timeout + retry, e.g. NOAA station list + predictions
+                    // on the tides page) real room to finish instead of a
+                    // fixed 4s sleep that reads "stuck loading" on nothing
+                    // more than normal network variance.
+                    await page.waitForFunction(
+                        () => document.getElementById('loading') === null || getComputedStyle(document.getElementById('loading')).display !== 'flex',
+                        null,
+                        { timeout: 18000 }
+                    ).catch(() => {}); // if it's genuinely stuck, fall through and let the stuckLoading check below report it
+                    await page.waitForTimeout(500); // let the just-populated DOM settle
                 }
 
                 const bodyText = await page.locator('body').innerText();

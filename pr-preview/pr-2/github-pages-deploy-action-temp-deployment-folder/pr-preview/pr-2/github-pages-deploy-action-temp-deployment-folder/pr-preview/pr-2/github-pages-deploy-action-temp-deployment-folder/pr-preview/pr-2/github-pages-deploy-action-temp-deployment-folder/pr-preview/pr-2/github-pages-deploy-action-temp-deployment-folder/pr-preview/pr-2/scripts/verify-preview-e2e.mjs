@@ -178,7 +178,12 @@ async function main() {
         await page.waitForSelector('#location-search', { timeout: 10000 });
         await page.fill('#location-search', '11561');
         await page.keyboard.press('Enter');
-        await page.waitForTimeout(6000);
+        // Wait for the location to actually resolve (not a fixed sleep) —
+        // navigating away while the geocoding fetch is still in-flight
+        // would have the browser cancel it (net::ERR_ABORTED) before the
+        // selection is saved, which is a test race, not a product bug.
+        await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, { timeout: 15000 });
+        await page.waitForTimeout(1000); // let localStorage write settle
         await page.goto(new URL('tides.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(10000);
 
