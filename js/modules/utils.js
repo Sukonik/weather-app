@@ -24,97 +24,65 @@ export function getWindDirection(degrees) {
 }
 
 export function getWeatherDescription(code) {
-    // OpenWeatherMap weather codes
     const descriptions = {
-        200: 'Thunderstorm with light rain',
-        201: 'Thunderstorm with rain',
-        202: 'Thunderstorm with heavy rain',
-        210: 'Light thunderstorm',
-        211: 'Thunderstorm',
-        212: 'Heavy thunderstorm',
-        221: 'Ragged thunderstorm',
-        230: 'Thunderstorm with light drizzle',
-        231: 'Thunderstorm with drizzle',
-        232: 'Thunderstorm with heavy drizzle',
-        300: 'Light drizzle',
-        301: 'Drizzle',
-        302: 'Heavy drizzle',
-        310: 'Light drizzle rain',
-        311: 'Drizzle rain',
-        312: 'Heavy drizzle rain',
-        313: 'Shower rain and drizzle',
-        314: 'Heavy shower rain and drizzle',
-        321: 'Shower drizzle',
-        500: 'Light rain',
-        501: 'Moderate rain',
-        502: 'Heavy rain',
-        503: 'Very heavy rain',
-        504: 'Extreme rain',
-        511: 'Freezing rain',
-        520: 'Light shower rain',
-        521: 'Shower rain',
-        522: 'Heavy shower rain',
-        531: 'Ragged shower rain',
-        600: 'Light snow',
-        601: 'Snow',
-        602: 'Heavy snow',
-        611: 'Sleet',
-        612: 'Light shower sleet',
-        613: 'Shower sleet',
-        615: 'Light rain and snow',
-        616: 'Rain and snow',
-        620: 'Light shower snow',
-        621: 'Shower snow',
-        622: 'Heavy shower snow',
-        701: 'Mist',
-        711: 'Smoke',
-        721: 'Haze',
-        731: 'Sand/dust whirls',
-        741: 'Fog',
-        751: 'Sand',
-        761: 'Dust',
-        762: 'Volcanic ash',
-        771: 'Squalls',
-        781: 'Tornado',
-        800: 'Clear sky',
-        801: 'Few clouds',
-        802: 'Scattered clouds',
-        803: 'Broken clouds',
-        804: 'Overcast clouds'
+        0: 'Clear sky',
+        1: 'Mainly clear',
+        2: 'Partly cloudy',
+        3: 'Overcast',
+        45: 'Foggy',
+        48: 'Depositing rime fog',
+        51: 'Light drizzle',
+        53: 'Moderate drizzle',
+        55: 'Dense drizzle',
+        61: 'Slight rain',
+        63: 'Moderate rain',
+        65: 'Heavy rain',
+        71: 'Slight snow',
+        73: 'Moderate snow',
+        75: 'Heavy snow',
+        77: 'Snow grains',
+        80: 'Slight rain showers',
+        81: 'Moderate rain showers',
+        82: 'Violent rain showers',
+        85: 'Slight snow showers',
+        86: 'Heavy snow showers',
+        95: 'Thunderstorm',
+        96: 'Thunderstorm with slight hail',
+        99: 'Thunderstorm with heavy hail'
     };
     return descriptions[code] || 'Unknown';
 }
 
 export function getWeatherIcon(code) {
-    // OpenWeatherMap weather codes
-    if (code >= 200 && code < 300) return 'fa-bolt';
-    if (code >= 300 && code < 400) return 'fa-cloud-rain';
-    if (code >= 500 && code < 600) return 'fa-cloud-showers-heavy';
-    if (code >= 600 && code < 700) return 'fa-snowflake';
-    if (code >= 700 && code < 800) return 'fa-smog';
-    if (code === 800) return 'fa-sun';
-    if (code > 800 && code < 900) return 'fa-cloud';
+    if (code === 0) return 'fa-sun';
+    if (code === 1) return 'fa-sun';
+    if (code === 2) return 'fa-cloud-sun';
+    if (code === 3) return 'fa-cloud';
+    if (code >= 45 && code <= 48) return 'fa-smog';
+    if (code >= 51 && code <= 55) return 'fa-cloud-rain';
+    if (code >= 61 && code <= 65) return 'fa-cloud-showers-heavy';
+    if (code >= 71 && code <= 77) return 'fa-snowflake';
+    if (code >= 80 && code <= 82) return 'fa-cloud-showers-heavy';
+    if (code >= 85 && code <= 86) return 'fa-snowflake';
+    if (code >= 95) return 'fa-bolt';
     return 'fa-cloud';
 }
 
-export function getUVIndexDescription(uvi) {
-    if (uvi <= 2) return { level: 'Low', description: 'No protection needed' };
-    if (uvi <= 5) return { level: 'Moderate', description: 'Wear sunscreen' };
-    if (uvi <= 7) return { level: 'High', description: 'Protection required' };
-    if (uvi <= 10) return { level: 'Very High', description: 'Extra precautions needed' };
-    return { level: 'Extreme', description: 'Avoid sun exposure' };
+export function getUVIndexDescription(uvIndex) {
+    if (uvIndex <= 2) return 'Low';
+    if (uvIndex <= 5) return 'Moderate';
+    if (uvIndex <= 7) return 'High';
+    if (uvIndex <= 10) return 'Very High';
+    return 'Extreme';
 }
 
 export function getAirQualityDescription(aqi) {
-    const descriptions = {
-        1: { level: 'Good', description: 'Air quality is satisfactory' },
-        2: { level: 'Moderate', description: 'Air quality is acceptable' },
-        3: { level: 'Unhealthy for Sensitive Groups', description: 'Members of sensitive groups may experience health effects' },
-        4: { level: 'Unhealthy', description: 'Everyone may experience health effects' },
-        5: { level: 'Very Unhealthy', description: 'Health alert: everyone may experience serious health effects' },
-        6: { level: 'Hazardous', description: 'Health warning: everyone may experience more serious health effects' }
-    };
-    return descriptions[aqi] || { level: 'Unknown', description: 'No data available' };
+    if (aqi <= 50) return 'Good';
+    if (aqi <= 100) return 'Moderate';
+    if (aqi <= 150) return 'Unhealthy for Sensitive Groups';
+    if (aqi <= 200) return 'Unhealthy';
+    if (aqi <= 300) return 'Very Unhealthy';
+    return 'Hazardous';
 }
 
 export function getAirQualityImplication(aqi) {
@@ -126,21 +94,28 @@ export function getAirQualityImplication(aqi) {
     return 'Health alert: everyone may experience serious health effects.';
 }
 
-export function getAirQualityColor(aqi) {
-    if (aqi <= 50) return '#00e400';  // Green
-    if (aqi <= 100) return '#ffff00';  // Yellow
-    if (aqi <= 150) return '#ff7e00';  // Orange
-    if (aqi <= 200) return '#ff0000';  // Red
-    if (aqi <= 300) return '#8f3f97';  // Purple
-    return '#7e0023';  // Maroon
+/**
+ * Semantic severity class (sev-1 = good … sev-6 = hazardous) instead of a
+ * hardcoded hex color. The actual color for each stop is a per-theme CSS
+ * token (see styles.css), so a "moderate" reading never renders as
+ * low-contrast pure yellow on a light card like Coffee.
+ */
+export function getAQISeverityClass(aqi) {
+    if (aqi <= 50) return 'sev-1';    // Good
+    if (aqi <= 100) return 'sev-2';   // Moderate
+    if (aqi <= 150) return 'sev-3';   // Unhealthy for Sensitive Groups
+    if (aqi <= 200) return 'sev-4';   // Unhealthy
+    if (aqi <= 300) return 'sev-5';   // Very Unhealthy
+    return 'sev-6';                   // Hazardous
 }
 
 export function getVisibilityDescription(visibility) {
-    if (visibility >= 10) return { level: 'Excellent', description: 'Clear visibility' };
-    if (visibility >= 5) return { level: 'Good', description: 'Good visibility' };
-    if (visibility >= 2) return { level: 'Moderate', description: 'Reduced visibility' };
-    if (visibility >= 1) return { level: 'Poor', description: 'Poor visibility' };
-    return { level: 'Very Poor', description: 'Dangerous conditions' };
+    const visibilityKm = visibility / 1000;
+    if (visibilityKm >= 10) return 'Excellent';
+    if (visibilityKm >= 5) return 'Good';
+    if (visibilityKm >= 2) return 'Moderate';
+    if (visibilityKm >= 1) return 'Poor';
+    return 'Very Poor';
 }
 
 export function getPrecipitationIntensity(intensity) {
@@ -148,4 +123,56 @@ export function getPrecipitationIntensity(intensity) {
     if (intensity < 2) return 'Moderate';
     if (intensity < 10) return 'Heavy';
     return 'Very Heavy';
-} 
+}
+
+export function getUVSeverityClass(uvIndex) {
+    if (uvIndex <= 2) return 'sev-1';   // Low
+    if (uvIndex <= 5) return 'sev-2';   // Moderate
+    if (uvIndex <= 7) return 'sev-3';   // High
+    if (uvIndex <= 10) return 'sev-5';  // Very High
+    return 'sev-6';                     // Extreme
+}
+
+export function convertLength(value, targetUnit, fromUnit) {
+    if (value == null || Number.isNaN(value)) return null;
+    if (fromUnit === targetUnit) return value;
+    // Canonical conversion via meters
+    const meters = fromUnit === 'ft' ? value * 0.3048 : value;
+    return targetUnit === 'ft' ? meters / 0.3048 : meters;
+}
+
+export function formatLength(value, targetUnit, fromUnit, decimals = 2) {
+    const converted = convertLength(value, targetUnit, fromUnit);
+    if (converted == null) return 'Data unavailable';
+    return `${converted.toFixed(decimals)} ${targetUnit}`;
+}
+
+export function getCloudCoverDescription(pct) {
+    if (pct <= 10) return 'Clear';
+    if (pct <= 40) return 'Mostly Clear';
+    if (pct <= 70) return 'Partly Cloudy';
+    if (pct <= 90) return 'Mostly Cloudy';
+    return 'Overcast';
+}
+
+/**
+ * Formats a numeric value, or returns a polished "unavailable" label when
+ * the value is null/undefined — used everywhere instead of letting a
+ * missing reading silently render as 0.
+ */
+export function formatValueOrUnavailable(value, formatter, unavailableLabel = 'Data unavailable') {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+        return unavailableLabel;
+    }
+    return formatter(value);
+}
+
+export function convertPressure(hPa, targetUnit) {
+    if (targetUnit === 'inHg') return hPa * 0.02953;
+    return hPa; // hPa (== mb)
+}
+
+export function formatPressure(hPa, unit = 'hPa') {
+    if (hPa === null || hPa === undefined) return 'Data unavailable';
+    return unit === 'inHg' ? `${convertPressure(hPa, 'inHg').toFixed(2)} inHg` : `${Math.round(hPa)} hPa`;
+}
