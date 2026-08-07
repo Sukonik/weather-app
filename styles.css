@@ -55,6 +55,15 @@
     --aurora-b: rgba(88, 86, 214, 0.22);
     --card-surface: rgba(255, 255, 255, 0.06);
     --card-border: rgba(255, 255, 255, 0.09);
+
+    /* Semantic tokens for large numeric values — dark already has strong
+       contrast against its bright accent, so it keeps that look. */
+    --metric-value-color: #ffffff;
+    --metric-accent-color: #4fc3f7;
+    --chart-label-color: rgba(255, 255, 255, 0.65);
+    --chart-cursor-color: #4fc3f7;
+    --sev-1: #3ddc84; --sev-2: #f4d13f; --sev-3: #ff9f43;
+    --sev-4: #ff5252; --sev-5: #b57bdb; --sev-6: #ff6b81;
 }
 
 :root[data-theme="light"] {
@@ -71,6 +80,14 @@
     --aurora-b: rgba(88, 86, 214, 0.1);
     --card-surface: rgba(255, 255, 255, 0.65);
     --card-border: rgba(255, 255, 255, 0.8);
+
+    /* Dark navy/slate numbers — pure yellow/black is out on this bright card. */
+    --metric-value-color: #16213e;
+    --metric-accent-color: #0059b3;
+    --chart-label-color: #5c5c5c;
+    --chart-cursor-color: #0059b3;
+    --sev-1: #1f9d55; --sev-2: #9c7a12; --sev-3: #d35400;
+    --sev-4: #c0392b; --sev-5: #7d3c98; --sev-6: #6e0a1e;
 }
 
 :root[data-theme="ocean"] {
@@ -87,6 +104,14 @@
     --aurora-b: rgba(0, 184, 148, 0.16);
     --card-surface: rgba(255, 255, 255, 0.06);
     --card-border: rgba(255, 255, 255, 0.1);
+
+    /* Bright aqua/blue-white, strong contrast against the deep ocean bg. */
+    --metric-value-color: #eafcff;
+    --metric-accent-color: #5be3ff;
+    --chart-label-color: rgba(236, 246, 251, 0.65);
+    --chart-cursor-color: #5be3ff;
+    --sev-1: #3ddc84; --sev-2: #f4d13f; --sev-3: #ff9f43;
+    --sev-4: #ff5252; --sev-5: #c299e0; --sev-6: #ff6b81;
 }
 
 :root[data-theme="jungle"] {
@@ -103,6 +128,14 @@
     --aurora-b: rgba(255, 213, 79, 0.1);
     --card-surface: rgba(255, 255, 255, 0.06);
     --card-border: rgba(255, 255, 255, 0.1);
+
+    /* Warm cream numbers read cleanly against the deep jungle green. */
+    --metric-value-color: #f5ecd9;
+    --metric-accent-color: #8ee6b0;
+    --chart-label-color: rgba(227, 239, 233, 0.65);
+    --chart-cursor-color: #8ee6b0;
+    --sev-1: #8ee6b0; --sev-2: #f5d78e; --sev-3: #ffa94d;
+    --sev-4: #ff6b6b; --sev-5: #d98ddb; --sev-6: #ff4d6d;
 }
 
 :root[data-theme="sunset"] {
@@ -119,6 +152,14 @@
     --aurora-b: rgba(255, 195, 113, 0.16);
     --card-surface: rgba(255, 255, 255, 0.07);
     --card-border: rgba(255, 255, 255, 0.12);
+
+    /* Light warm accent, strong contrast against the dark purple bg. */
+    --metric-value-color: #ffd9b3;
+    --metric-accent-color: #ff9f68;
+    --chart-label-color: rgba(253, 241, 231, 0.65);
+    --chart-cursor-color: #ff9f68;
+    --sev-1: #8ee6b0; --sev-2: #ffd479; --sev-3: #ff9f68;
+    --sev-4: #ff6f6f; --sev-5: #e29bde; --sev-6: #ff5277;
 }
 
 :root[data-theme="coffee"] {
@@ -135,6 +176,14 @@
     --aurora-b: rgba(122, 156, 112, 0.12);
     --card-surface: rgba(255, 255, 255, 0.55);
     --card-border: rgba(255, 255, 255, 0.75);
+
+    /* Dark espresso/brown numbers — never yellow on this light, warm card. */
+    --metric-value-color: #3a2318;
+    --metric-accent-color: #8a4a1f;
+    --chart-label-color: #8a6a52;
+    --chart-cursor-color: #8a4a1f;
+    --sev-1: #3f7d43; --sev-2: #8a6d1f; --sev-3: #b25b1d;
+    --sev-4: #a13a2f; --sev-5: #6c4675; --sev-6: #5c1a1a;
 }
 
 * {
@@ -598,6 +647,7 @@ header {
     font-weight: 800;
     letter-spacing: -0.02em;
     line-height: 1;
+    color: var(--metric-value-color);
     margin: var(--space-3) 0;
 }
 
@@ -728,6 +778,113 @@ header {
     line-height: 1.5;
 }
 
+/* Visually-hidden but still announced by screen readers */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Interactive tide chart */
+.range-toggle {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.range-btn {
+    flex: none;
+    padding: 0.35rem 0.8rem;
+    font-size: var(--font-xs);
+}
+
+.tide-slider-label {
+    display: block;
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    margin-top: var(--space-2);
+}
+
+.tide-slider {
+    width: 100%;
+    height: 28px;
+    margin: var(--space-1) 0 var(--space-3);
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.tide-slider:focus-visible {
+    outline: 2px solid var(--chart-cursor-color);
+    outline-offset: 4px;
+    border-radius: var(--radius-sm);
+}
+
+.tide-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    background: var(--card-border);
+    border-radius: var(--radius-pill);
+}
+
+.tide-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -7px;
+    border-radius: 50%;
+    background: var(--chart-cursor-color);
+    border: 2px solid var(--metric-value-color);
+    cursor: pointer;
+}
+
+.tide-slider::-moz-range-track {
+    height: 4px;
+    background: var(--card-border);
+    border-radius: var(--radius-pill);
+}
+
+.tide-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--chart-cursor-color);
+    border: 2px solid var(--metric-value-color);
+    cursor: pointer;
+}
+
+.tide-selected-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-2) var(--space-4);
+    background: var(--hover-bg);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+}
+
+.tide-selected-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: var(--font-sm);
+}
+
+.tsp-label { color: var(--text-secondary); }
+.tsp-value { color: var(--metric-value-color); font-weight: 700; }
+
+#tide-chart {
+    cursor: pointer;
+}
+#tide-chart:focus-visible {
+    outline: 2px solid var(--chart-cursor-color);
+    outline-offset: 2px;
+}
+
 /* Tide warnings */
 .modeled-warning,
 .inland-message {
@@ -773,7 +930,8 @@ header {
 }
 
 .unit-btn,
-.speed-unit-btn {
+.speed-unit-btn,
+.length-unit-btn {
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -785,14 +943,24 @@ header {
 }
 
 .unit-btn:hover,
-.speed-unit-btn:hover {
+.speed-unit-btn:hover,
+.length-unit-btn:hover {
     background-color: var(--hover-bg);
 }
 
 .unit-btn.active,
-.speed-unit-btn.active {
+.speed-unit-btn.active,
+.length-unit-btn.active {
     background-color: var(--accent);
     color: white;
+}
+
+.temp-units,
+.speed-units,
+.length-units {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .separator {
@@ -909,6 +1077,7 @@ button:hover {
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1;
+    color: var(--metric-value-color);
     cursor: pointer;
     transition: opacity 0.2s;
 }
@@ -962,9 +1131,20 @@ button:hover {
     gap: 0.35rem;
 }
 
-.hilo-high i { color: #ff9f43; }
-.hilo-low i { color: #4fa8ff; }
+.hilo-high i, .hilo-low i { color: var(--metric-accent-color); }
 .hilo-sep { opacity: 0.4; }
+.hilo-high span, .hilo-low span { color: var(--metric-value-color); font-weight: 700; }
+
+/* Semantic severity ramp — shared by AQI/UV/etc. Six stops from "good" to
+   "hazardous", tuned per theme above so none of them wash out on light
+   cards (Coffee/Light) or dark ones. Never hardcode a hex color for a
+   metric value directly; add/use one of these classes instead. */
+.sev-1 { color: var(--sev-1); }
+.sev-2 { color: var(--sev-2); }
+.sev-3 { color: var(--sev-3); }
+.sev-4 { color: var(--sev-4); }
+.sev-5 { color: var(--sev-5); }
+.sev-6 { color: var(--sev-6); }
 
 .weather-details {
     display: grid;
@@ -1087,6 +1267,7 @@ button:hover {
 .detail-item .value {
     font-size: 1.2rem;
     font-weight: 600;
+    color: var(--metric-value-color);
 }
 
 /* New wind styles */
@@ -1239,7 +1420,7 @@ button:hover {
 .card-value {
     font-size: 2rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--metric-value-color);
     margin-bottom: 0.5rem;
 }
 
@@ -1255,22 +1436,11 @@ button:hover {
     font-size: 1rem;
 }
 
-/* Card-specific styles */
+/* Card-specific styles — value color comes from --metric-value-color by
+   default (set on .card-value); the AQI/UV cards override it dynamically
+   via a .sev-N class applied in JS instead of a hardcoded hex here. */
 .precipitation-card .card-value {
-    color: #3498db;
     margin-bottom: 0.5rem;
-}
-
-.air-quality-card .card-value {
-    color: #2ecc71;
-}
-
-.uv-card .card-value {
-    color: #f1c40f;
-}
-
-.visibility-card .card-value {
-    color: #9b59b6;
 }
 
 .card-pollutants {
@@ -1585,7 +1755,7 @@ button:hover {
 .card-value {
     font-size: 2.5rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--metric-value-color);
 }
 
 .card-description {
@@ -1900,7 +2070,7 @@ button,
 .value-display span {
     font-size: 2rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--metric-value-color);
 }
 
 .value-display .direction {

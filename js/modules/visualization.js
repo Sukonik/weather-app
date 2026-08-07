@@ -1,6 +1,13 @@
 const baseUrl = window.location.hostname === 'sukonik.github.io' ? '/weather-app' : '';
 import { convertTemperature, formatSpeed, getWindDirection, getPrecipitationIntensity } from './utils.js';
 
+/** Reads a CSS custom property's current computed value so canvas drawing
+ * (which can't use var() directly) still follows the active theme. */
+export function getThemeColor(varName, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    return v || fallback;
+}
+
 export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
@@ -13,9 +20,13 @@ export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
     const padding = 20;
     const chartWidth = width - (padding * 2);
     const chartHeight = height - (padding * 2);
-    
-    // Draw background grid
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+
+    const labelColor = options.labelColor || getThemeColor('--chart-label-color', 'rgba(255,255,255,0.65)');
+
+    // Draw background grid — theme-aware so it stays faint but visible on
+    // both dark cards and light ones (Coffee/Light).
+    ctx.strokeStyle = labelColor;
+    ctx.globalAlpha = 0.25;
     ctx.beginPath();
     for (let i = 0; i <= count; i++) {
         const x = padding + (i * (chartWidth / count));
@@ -23,13 +34,14 @@ export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
         ctx.lineTo(x, height - padding);
     }
     ctx.stroke();
+    ctx.globalAlpha = 1;
 
     // Calculate scale
     const maxValue = Math.max(...values) * 1.2;
     const scale = chartHeight / maxValue;
 
     // Draw data points
-    ctx.strokeStyle = options.color || '#007AFF';
+    ctx.strokeStyle = options.color || getThemeColor('--chart-cursor-color', '#007AFF');
     ctx.lineWidth = 2;
     ctx.beginPath();
     values.forEach((value, i) => {
@@ -43,10 +55,11 @@ export function drawHourlyChart(canvas, data, startIndex, count, options = {}) {
     });
     ctx.stroke();
 
-    // Draw current value
+    // Draw current value label — theme-aware color so it's never invisible
+    // white-on-light (Coffee/Light) or dark-on-dark.
     const currentValue = values[0];
-    ctx.fillStyle = '#fff';
-    ctx.font = '14px Arial';
+    ctx.fillStyle = labelColor;
+    ctx.font = '600 14px Inter, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(options.formatValue ? options.formatValue(currentValue) : currentValue, padding, padding - 5);
 }

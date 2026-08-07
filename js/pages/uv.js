@@ -1,6 +1,6 @@
 import { initChrome, onLocationChange } from '../modules/chrome.js';
 import { fetchJSON, cacheGet, cacheSet, formatUpdatedTime, makeAbortGroup } from '../modules/fetchUtils.js';
-import { getUVIndexDescription, getUVColor } from '../modules/utils.js';
+import { getUVIndexDescription, getUVSeverityClass } from '../modules/utils.js';
 import { drawHourlyChart } from '../modules/visualization.js';
 
 const UNAVAILABLE = 'Data unavailable';
@@ -47,7 +47,8 @@ function initApp() {
         const valueEl = document.getElementById('uv-page-value');
         const statusEl = document.getElementById('uv-page-status');
         valueEl.textContent = uv != null ? Math.round(uv) : '—';
-        if (uv != null) valueEl.style.color = getUVColor(uv);
+        valueEl.classList.remove('sev-1', 'sev-2', 'sev-3', 'sev-4', 'sev-5', 'sev-6');
+        if (uv != null) valueEl.classList.add(getUVSeverityClass(uv));
         const level = uv != null ? getUVIndexDescription(uv) : null;
         statusEl.textContent = level || UNAVAILABLE;
 

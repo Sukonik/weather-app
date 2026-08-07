@@ -5,10 +5,10 @@ try {
         getWeatherDescription,
         getWeatherIcon,
         getUVIndexDescription,
-        getUVColor,
+        getUVSeverityClass,
         getAirQualityDescription,
         getAirQualityImplication,
-        getAirQualityColor,
+        getAQISeverityClass,
         getVisibilityDescription,
         getCloudCoverDescription,
         getWindDirection,
@@ -209,7 +209,8 @@ try {
 
             if (aqiElement) {
                 aqiElement.textContent = aqi ?? '—';
-                aqiElement.style.color = aqi != null ? getAirQualityColor(aqi) : '';
+                aqiElement.classList.remove('sev-1', 'sev-2', 'sev-3', 'sev-4', 'sev-5', 'sev-6');
+                if (aqi != null) aqiElement.classList.add(getAQISeverityClass(aqi));
             }
             if (aqiStatus) aqiStatus.textContent = aqi != null ? getAirQualityDescription(aqi) : (data.air_quality_error || UNAVAILABLE);
             if (aqiDesc) aqiDesc.textContent = aqi != null
@@ -244,7 +245,8 @@ try {
             const uvStatusEl = document.getElementById('uv-index-status');
             if (uvValueEl) {
                 uvValueEl.textContent = na(data.current.uv_index, v => Math.round(v));
-                if (data.current.uv_index != null) uvValueEl.style.color = getUVColor(data.current.uv_index);
+                uvValueEl.classList.remove('sev-1', 'sev-2', 'sev-3', 'sev-4', 'sev-5', 'sev-6');
+                if (data.current.uv_index != null) uvValueEl.classList.add(getUVSeverityClass(data.current.uv_index));
             }
             if (uvStatusEl) {
                 const peakUv = data.daily?.uv_index_max?.[0];
