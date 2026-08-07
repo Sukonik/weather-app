@@ -1,6 +1,13 @@
 // Coastal conditions: NOAA CO-OPS (authoritative for US tide stations) with
-// an Open-Meteo Marine fallback for global coastal locations. Both are free
-// and require no API key.
+// an Open-Meteo Marine fallback for global coastal locations / anything a
+// nearby NOAA station doesn't cover. Both are free and require no API key.
+//
+// Tide predictions, water level, and water temperature can each come from a
+// *different* NOAA station — a subordinate tide-prediction station rarely
+// also carries a water-level sensor, for example — so each product is
+// resolved to its own nearest active station independently, and every
+// reading is labeled with exactly which station (and how far away it is)
+// it came from. A distant reading is never presented as if it were local.
 import { fetchJSON, cacheGet, cacheSet } from './fetchUtils.js';
 
 const NOAA_METADATA_BASE = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations';
@@ -9,6 +16,7 @@ const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine';
 
 const PREFERRED_US_STATION = '8516663'; // Long Beach, NY — evaluated first per product requirement
 const STATION_LIST_CACHE_MS = 24 * 60 * 60 * 1000; // station list changes rarely
+const MAX_OBSERVATION_KM = 100; // beyond this, an NOAA reading no longer represents "local" conditions
 
 function haversineKm(lat1, lon1, lat2, lon2) {
     const R = 6371;
@@ -18,27 +26,52 @@ function haversineKm(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function getTidePredictionStations() {
-    const cached = cacheGet('noaa_tide_stations', STATION_LIST_CACHE_MS);
+async function getStationsByType(type) {
+    const cacheKey = `noaa_stations_${type}`;
+    const cached = cacheGet(cacheKey, STATION_LIST_CACHE_MS);
     if (cached) return cached;
-    const data = await fetchJSON(`${NOAA_METADATA_BASE}.json?type=tidepredictions&units=english`, { timeoutMs: 10000, retries: 1 });
+    const data = await fetchJSON(`${NOAA_METADATA_BASE}.json?type=${type}&units=english`, { timeoutMs: 10000, retries: 1 });
     const stations = data.stations || [];
-    cacheSet('noaa_tide_stations', stations);
+    cacheSet(cacheKey, stations);
     return stations;
 }
 
-async function stationSupportsPredictions(stationId) {
+async function stationSupportsProduct(stationId, productName) {
     try {
         const data = await fetchJSON(`${NOAA_METADATA_BASE}/${stationId}.json?expand=products`, { timeoutMs: 6000, retries: 0 });
         const products = data?.stations?.[0]?.products?.products || [];
-        return products.some(p => p.name === 'Tide Predictions');
+        return products.some(p => p.name === productName);
     } catch {
         return false;
     }
 }
 
+function nearestCandidates(stations, latitude, longitude, count) {
+    return stations
+        .map(s => ({ id: s.id, name: s.name, latitude: parseFloat(s.lat), longitude: parseFloat(s.lng), distanceKm: haversineKm(latitude, longitude, parseFloat(s.lat), parseFloat(s.lng)) }))
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, count);
+}
+
+/**
+ * Dynamically finds the nearest station that actually reports the
+ * requested product, checking a handful of the closest candidates (rather
+ * than assuming distance alone implies capability). Returns null if none
+ * of the checked candidates are within maxKm and support the product.
+ */
+async function findNearestStationForProduct(latitude, longitude, { type, productName, maxKm = MAX_OBSERVATION_KM, checkCount = 6 }) {
+    const stations = await getStationsByType(type);
+    const candidates = nearestCandidates(stations, latitude, longitude, checkCount);
+    for (const c of candidates) {
+        if (c.distanceKm > maxKm) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if (await stationSupportsProduct(c.id, productName)) return c;
+    }
+    return null;
+}
+
 async function findNearestStation(latitude, longitude, maxKm = 120) {
-    const stations = await getTidePredictionStations();
+    const stations = await getStationsByType('tidepredictions');
     let nearest = null;
     let nearestDist = Infinity;
     for (const s of stations) {
@@ -58,16 +91,15 @@ async function fetchNOAAProduct(stationId, product, extraParams = '') {
 }
 
 /**
- * Resolve the tide station to use: try the preferred US station first (per
- * requirement, station 8516663 for Long Beach NY), confirm it supports
- * predictions, else fall back to the nearest valid station within range.
+ * Resolve the tide-*prediction* station to use: try the preferred US
+ * station first (per requirement, station 8516663 for Long Beach NY),
+ * confirm it supports predictions, else fall back to the nearest valid
+ * station within range.
  */
 export async function resolveNOAAStation(latitude, longitude) {
-    // Only try the hardcoded preferred station when we're actually near it
-    // (Long Beach, NY area) — otherwise go straight to nearest-station logic.
     const nearPreferred = haversineKm(latitude, longitude, 40.5892, -73.6579) < 50;
     if (nearPreferred) {
-        const supported = await stationSupportsPredictions(PREFERRED_US_STATION);
+        const supported = await stationSupportsProduct(PREFERRED_US_STATION, 'Tide Predictions');
         if (supported) {
             return { id: PREFERRED_US_STATION, name: 'Long Beach, NY', latitude: 40.5892, longitude: -73.6579, distanceKm: haversineKm(latitude, longitude, 40.5892, -73.6579) };
         }
@@ -75,40 +107,59 @@ export async function resolveNOAAStation(latitude, longitude) {
     return findNearestStation(latitude, longitude);
 }
 
-/** Full US coastal tide report via NOAA CO-OPS for a resolved station. */
-export async function getNOAATideData(station) {
-    const results = await Promise.allSettled([
-        fetchNOAAProduct(station.id, 'predictions', '&date=today&range=48&interval=hilo'),
-        fetchNOAAProduct(station.id, 'predictions', '&date=today&range=48'),
-        fetchNOAAProduct(station.id, 'water_level', '&date=latest'),
-        fetchNOAAProduct(station.id, 'water_temperature', '&date=latest')
+/**
+ * Full US coastal tide report via NOAA CO-OPS. Predictions (curve + hilo)
+ * come from `predictionStation`; water level and water temperature are
+ * resolved to their own nearest *active* stations (which may differ from
+ * the prediction station, and from each other) and are only used if within
+ * MAX_OBSERVATION_KM — otherwise the caller falls back to Open-Meteo
+ * Marine's modeled estimate for that specific field.
+ */
+export async function getNOAATideData(predictionStation, latitude, longitude) {
+    const [waterLevelStation, waterTempStation] = await Promise.all([
+        findNearestStationForProduct(latitude, longitude, { type: 'waterlevels', productName: 'Water Level' }),
+        findNearestStationForProduct(latitude, longitude, { type: 'waterlevels', productName: 'Water Temperature' })
     ]);
 
+    const jobs = [
+        fetchNOAAProduct(predictionStation.id, 'predictions', '&date=today&range=48&interval=hilo'),
+        // 6-minute interval predictions (NOAA's finest granularity) — real
+        // data points only, never interpolated/invented between them.
+        fetchNOAAProduct(predictionStation.id, 'predictions', '&date=today&range=48'),
+        waterLevelStation ? fetchNOAAProduct(waterLevelStation.id, 'water_level', '&date=latest') : Promise.resolve(null),
+        waterTempStation ? fetchNOAAProduct(waterTempStation.id, 'water_temperature', '&date=latest') : Promise.resolve(null)
+    ];
+    const results = await Promise.allSettled(jobs);
     const [hiloResult, curveResult, waterLevelResult, waterTempResult] = results;
 
     const hilo = hiloResult.status === 'fulfilled' ? hiloResult.value?.predictions || [] : [];
     const curve = curveResult.status === 'fulfilled' ? curveResult.value?.predictions || [] : [];
-    const waterLevel = waterLevelResult.status === 'fulfilled' ? waterLevelResult.value?.data?.[0] : null;
-    const waterTemp = waterTempResult.status === 'fulfilled' ? waterTempResult.value?.data?.[0] : null;
+    const waterLevelRaw = waterLevelResult.status === 'fulfilled' ? waterLevelResult.value?.data?.[0] : null;
+    const waterTempRaw = waterTempResult.status === 'fulfilled' ? waterTempResult.value?.data?.[0] : null;
 
-    // NOAA CO-OPS returns "YYYY-MM-DD HH:MM" in the requested time_zone (lst_ldt
-    // here, i.e. local station time) — replace the space with 'T' so Date can
-    // parse it; appending 'Z' would be wrong since it's not UTC.
+    // NOAA CO-OPS returns "YYYY-MM-DD HH:MM" in the requested time_zone
+    // (lst_ldt here — the station's own local standard/daylight time,
+    // already DST-correct) — replace the space with 'T' so Date can parse
+    // it; appending 'Z' would be wrong since it's not UTC.
     const parseNOAATime = (t) => new Date(t.replace(' ', 'T')).getTime();
     const now = Date.now();
     const nextHigh = hilo.find(p => p.type === 'H' && parseNOAATime(p.t) > now) || null;
     const nextLow = hilo.find(p => p.type === 'L' && parseNOAATime(p.t) > now) || null;
 
     return {
-        station,
+        predictionStation,
         source: 'NOAA CO-OPS',
         isModeled: false,
         hilo,
         curve,
         nextHigh: nextHigh || null,
         nextLow: nextLow || null,
-        waterLevel: waterLevel ? { value: parseFloat(waterLevel.v), time: waterLevel.t } : null,
-        waterTemperatureF: waterTemp ? parseFloat(waterTemp.v) : null,
+        waterLevel: (waterLevelRaw && waterLevelStation)
+            ? { value: parseFloat(waterLevelRaw.v), time: waterLevelRaw.t, station: waterLevelStation, label: `Observed at ${waterLevelStation.name} (NOAA #${waterLevelStation.id}, ${waterLevelStation.distanceKm.toFixed(1)} km away)` }
+            : null,
+        waterTemperature: (waterTempRaw && waterTempStation)
+            ? { valueF: parseFloat(waterTempRaw.v), time: waterTempRaw.t, station: waterTempStation, label: `Observed at ${waterTempStation.name} (NOAA #${waterTempStation.id}, ${waterTempStation.distanceKm.toFixed(1)} km away)` }
+            : null,
         fetchErrors: results.filter(r => r.status === 'rejected').length
     };
 }
@@ -126,6 +177,7 @@ export async function getMarineData(latitude, longitude) {
     if (!isCoastal) return null; // Open-Meteo returns nulls for non-ocean grid cells — treat as inland
 
     // Approximate high/low extrema by scanning the modeled sea-level curve
+    // (only over the real returned hourly points — no invented values).
     const times = (data.hourly?.time || []).map(t => new Date(t).getTime());
     const extrema = [];
     for (let i = 1; i < hourlyHeights.length - 1; i++) {
