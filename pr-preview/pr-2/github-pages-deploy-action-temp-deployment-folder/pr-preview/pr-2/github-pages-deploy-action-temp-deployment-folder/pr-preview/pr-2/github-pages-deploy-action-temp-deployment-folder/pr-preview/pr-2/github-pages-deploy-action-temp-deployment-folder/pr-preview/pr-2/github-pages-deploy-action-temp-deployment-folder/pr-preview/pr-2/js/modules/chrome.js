@@ -20,6 +20,7 @@ let state = {
     theme: localStorage.getItem('theme') || 'dark',
     unit: localStorage.getItem('unit') || 'C',
     speedUnit: localStorage.getItem('speedUnit') || 'km/h',
+    lengthUnit: localStorage.getItem('lengthUnit') || 'ft',
     location: getLastLocation()
 };
 
@@ -54,7 +55,7 @@ function emitLocationChange() {
 }
 
 export function getUnits() {
-    return { unit: state.unit, speedUnit: state.speedUnit };
+    return { unit: state.unit, speedUnit: state.speedUnit, lengthUnit: state.lengthUnit };
 }
 
 export function onUnitsChange(fn) {
@@ -77,6 +78,7 @@ function applyTheme(theme) {
 function applyUnits() {
     document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.unit === state.unit));
     document.querySelectorAll('.speed-unit-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.speedUnit === state.speedUnit));
+    document.querySelectorAll('.length-unit-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.lengthUnit === state.lengthUnit));
     document.dispatchEvent(new CustomEvent('clearsky:unitschange', { detail: getUnits() }));
 }
 
@@ -120,6 +122,11 @@ function chromeTemplate(activePage) {
                         <div class="speed-units">
                             <button class="speed-unit-btn" data-speed-unit="km/h">km/h</button><span class="separator">|</span>
                             <button class="speed-unit-btn" data-speed-unit="mph">mph</button>
+                        </div>
+                        <span class="units-separator"></span>
+                        <div class="length-units">
+                            <button class="length-unit-btn" data-length-unit="ft">ft</button><span class="separator">|</span>
+                            <button class="length-unit-btn" data-length-unit="m">m</button>
                         </div>
                     </div>
                     <div class="nav-selector">
@@ -289,6 +296,11 @@ export function initChrome({ page = 'overview' } = {}) {
     mount.querySelectorAll('.speed-unit-btn').forEach(btn => btn.addEventListener('click', () => {
         state.speedUnit = btn.dataset.speedUnit;
         localStorage.setItem('speedUnit', state.speedUnit);
+        applyUnits();
+    }));
+    mount.querySelectorAll('.length-unit-btn').forEach(btn => btn.addEventListener('click', () => {
+        state.lengthUnit = btn.dataset.lengthUnit;
+        localStorage.setItem('lengthUnit', state.lengthUnit);
         applyUnits();
     }));
 

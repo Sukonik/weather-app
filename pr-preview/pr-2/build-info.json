@@ -1,7 +1,7 @@
 {
   "sourceBranch": "claude/clearsky-mobile-responsive-0kpe12",
-  "commitSha": "71be48d66b80521790963fbc29b7544d3377c79e",
-  "deployedAt": "2026-08-07T14:33:43Z",
+  "commitSha": "760ac854c53e7e5d1f01d3fa3f794f8ec07dd238",
+  "deployedAt": "2026-08-07T19:43:56Z",
   "previewPath": "/pr-preview/pr-2/",
-  "workflowRunId": "31187937179"
+  "workflowRunId": "31212744705"
 }
