@@ -42,8 +42,26 @@ const QUERIES = ['11561', '10001'];
 const lines = [];
 function log(s = '') { lines.push(s); console.log(s); }
 
-async function main() {
+// Every search after the very first one in a shared browser process was
+// observed hanging indefinitely (no console error, no failed/aborted
+// request — the fetch just never resolves) across independent CI runs,
+// regardless of which query or step triggered it. That signature — silent,
+// permanent stalls only on the *second+* use of a browser process, never
+// the first — points at Chromium's per-host connection-pool/keepalive
+// state being shared across BrowserContexts in one browser process rather
+// than anything in the app or the network. Giving each search-driving
+// section its own freshly launched browser (not just a new context)
+// sidesteps that shared state entirely.
+async function withBrowser(fn) {
     const browser = await chromium.launch();
+    try {
+        return await fn(browser);
+    } finally {
+        await browser.close();
+    }
+}
+
+async function main() {
     let failures = 0;
 
     log('# ClearSky Live Preview E2E Verification\n');
@@ -51,221 +69,224 @@ async function main() {
     log(`Expected commit: ${EXPECTED_SHA || '(not checked)'}\n`);
 
     // 1. build-info.json matches expected commit
-    try {
-        const page = await browser.newPage();
-        const res = await page.goto(new URL('build-info.json', PREVIEW_URL).toString(), { timeout: 15000 });
-        const body = await res.text();
-        const info = JSON.parse(body);
-        log('## build-info.json');
-        log('```json\n' + JSON.stringify(info, null, 2) + '\n```');
-        if (EXPECTED_SHA && info.commitSha !== EXPECTED_SHA) {
-            log(`❌ commitSha mismatch: expected ${EXPECTED_SHA}, got ${info.commitSha}`);
-            failures++;
-        } else {
+    failures += await withBrowser(async (browser) => {
+        try {
+            const page = await browser.newPage();
+            const res = await page.goto(new URL('build-info.json', PREVIEW_URL).toString(), { timeout: 15000 });
+            const body = await res.text();
+            const info = JSON.parse(body);
+            log('## build-info.json');
+            log('```json\n' + JSON.stringify(info, null, 2) + '\n```');
+            if (EXPECTED_SHA && info.commitSha !== EXPECTED_SHA) {
+                log(`❌ commitSha mismatch: expected ${EXPECTED_SHA}, got ${info.commitSha}`);
+                await page.close();
+                return 1;
+            }
             log('✅ build-info.json commit matches expected SHA (or no expectation set)');
+            await page.close();
+            return 0;
+        } catch (error) {
+            log(`❌ Could not read build-info.json: ${error.message}`);
+            return 1;
         }
-        await page.close();
-    } catch (error) {
-        log(`❌ Could not read build-info.json: ${error.message}`);
-        failures++;
-    }
+    });
 
     // 2. Every page loads with the shared nav (standalone visit, default location)
     log('\n## Page load + nav check');
-    for (const p of PAGES) {
-        try {
-            const page = await browser.newPage();
-            await page.goto(new URL(p.file, PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
-            await page.waitForSelector('#app-chrome header', { timeout: 10000 });
-            const navCount = await page.locator('.nav-option').count();
-            const ok = navCount === PAGES.length;
-            log(`${ok ? '✅' : '❌'} ${p.label} (${p.file}): nav has ${navCount}/${PAGES.length} links`);
-            if (!ok) failures++;
-            await page.close();
-        } catch (error) {
-            log(`❌ ${p.label} (${p.file}) failed to load: ${error.message}`);
-            failures++;
+    failures += await withBrowser(async (browser) => {
+        let f = 0;
+        for (const p of PAGES) {
+            try {
+                const page = await browser.newPage();
+                await page.goto(new URL(p.file, PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+                await page.waitForSelector('#app-chrome header', { timeout: 10000 });
+                const navCount = await page.locator('.nav-option').count();
+                const ok = navCount === PAGES.length;
+                log(`${ok ? '✅' : '❌'} ${p.label} (${p.file}): nav has ${navCount}/${PAGES.length} links`);
+                if (!ok) f++;
+                await page.close();
+            } catch (error) {
+                log(`❌ ${p.label} (${p.file}) failed to load: ${error.message}`);
+                f++;
+            }
         }
-    }
+        return f;
+    });
+
+    // Give the page's data fetch (which can itself involve an 8s-timeout +
+    // retry, e.g. NOAA station list + predictions on the tides page, or the
+    // weather+AQI Promise.allSettled kicked off by a search) real room to
+    // finish instead of a fixed sleep that reads "stuck loading" on nothing
+    // more than normal network variance.
+    const waitForLoadingClear = (page) => page.waitForFunction(
+        () => document.getElementById('loading') === null || getComputedStyle(document.getElementById('loading')).display !== 'flex',
+        null,
+        { timeout: 18000 }
+    ).catch(() => {}); // if it's genuinely stuck, fall through and let the stuckLoading check report it
 
     // 3. Search on Overview, then navigate to every other page via the nav
     // menu (not a direct URL) to prove location/theme/units persist —
-    // screenshotting each of the 7 pages along the way.
+    // screenshotting each of the 7 pages along the way. Each query gets its
+    // own fresh browser (see withBrowser).
     for (const query of QUERIES) {
         log(`\n## Journey: search "${query}" then visit all 7 pages via nav`);
-        let page, ctx;
-        const consoleErrors = [];
-        const failedRequests = [];
-        try {
-            ctx = await browser.newContext();
-            page = await ctx.newPage();
-            page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
-            page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`));
-            page.on('requestfailed', req => failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`));
-            page.on('response', res => { if (!res.ok() && (res.url().includes('geocoding') || res.url().includes('open-meteo'))) failedRequests.push(`HTTP ${res.status()} ${res.url()}`); });
+        failures += await withBrowser(async (browser) => {
+            let page;
+            const consoleErrors = [];
+            const failedRequests = [];
+            try {
+                page = await browser.newPage();
+                page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
+                page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`));
+                page.on('requestfailed', req => failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`));
+                page.on('response', res => { if (!res.ok() && (res.url().includes('geocoding') || res.url().includes('open-meteo'))) failedRequests.push(`HTTP ${res.status()} ${res.url()}`); });
 
-            await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
-            await page.waitForSelector('#location-search', { timeout: 10000 });
+                await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+                await page.waitForSelector('#location-search', { timeout: 10000 });
 
-            // Set a non-default theme/unit before searching, to verify persistence
-            await page.click('#theme-btn');
-            await page.click('.theme-option[data-theme="ocean"]');
-            await page.click('.unit-btn[data-unit="F"]');
-            await page.click('.speed-unit-btn[data-speed-unit="mph"]');
+                // Set a non-default theme/unit before searching, to verify persistence
+                await page.click('#theme-btn');
+                await page.click('.theme-option[data-theme="ocean"]');
+                await page.click('.unit-btn[data-unit="F"]');
+                await page.click('.speed-unit-btn[data-speed-unit="mph"]');
 
-            await page.fill('#location-search', query);
-            await page.keyboard.press('Enter');
-            // Wait for the location to actually resolve before navigating —
-            // a fixed sleep can fire while the geocoding fetch is still
-            // in-flight, and the subsequent nav-click cancels it. The app's
-            // own fetchWithTimeout gives a request up to ~8s, then retries
-            // once more (another ~8s + backoff) before giving up, so the
-            // real-world worst case is ~16-17s on a slow/flaky network —
-            // the wait here must comfortably exceed that, not just the
-            // happy-path latency, or this is a test-patience failure dressed
-            // up as a product bug.
-            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
+                await page.fill('#location-search', query);
+                await page.keyboard.press('Enter');
+                // Wait for the location to actually resolve before navigating —
+                // a fixed sleep can fire while the geocoding fetch is still
+                // in-flight, and the subsequent nav-click cancels it. The app's
+                // own fetchWithTimeout gives a request up to ~8s, then retries
+                // once more (another ~8s + backoff) before giving up, so the
+                // real-world worst case is ~16-17s on a slow/flaky network —
+                // the wait here must comfortably exceed that.
+                await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
+                await waitForLoadingClear(page);
 
-            // Give the page's data fetch (which can itself involve an
-            // 8s-timeout + retry, e.g. NOAA station list + predictions on the
-            // tides page, or the weather+AQI Promise.allSettled kicked off by
-            // the search that just resolved) real room to finish instead of a
-            // fixed sleep that reads "stuck loading" on nothing more than
-            // normal network variance. Applies to Overview too — the search
-            // resolving only means the location was found, not that its
-            // weather/AQI data has arrived yet.
-            const waitForLoadingClear = () => page.waitForFunction(
-                () => document.getElementById('loading') === null || getComputedStyle(document.getElementById('loading')).display !== 'flex',
-                null,
-                { timeout: 18000 }
-            ).catch(() => {}); // if it's genuinely stuck, fall through and let the stuckLoading check below report it
+                let f = 0;
+                for (const p of PAGES) {
+                    if (p.id !== 'overview') {
+                        await page.click('#nav-btn');
+                        await page.click(`.nav-option[href="${p.file}"]`);
+                        await page.waitForLoadState('domcontentloaded');
+                        await waitForLoadingClear(page);
+                    }
+                    await page.waitForTimeout(500); // let the just-populated DOM settle
 
-            for (const p of PAGES) {
-                if (p.id !== 'overview') {
-                    await page.click('#nav-btn');
-                    await page.click(`.nav-option[href="${p.file}"]`);
-                    await page.waitForLoadState('domcontentloaded');
+                    const bodyText = await page.locator('body').innerText();
+                    const hasNaN = /\bNaN\b/.test(bodyText);
+                    const hasUndefined = /\bundefined\b/.test(bodyText);
+                    const stuckLoading = await page.locator('#loading').evaluate(el => getComputedStyle(el).display === 'flex').catch(() => false);
+                    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+                    const unitActive = await page.locator('.unit-btn.active').getAttribute('data-unit').catch(() => null);
+                    const speedActive = await page.locator('.speed-unit-btn.active').getAttribute('data-speed-unit').catch(() => null);
+                    const persisted = theme === 'ocean' && unitActive === 'F' && speedActive === 'mph';
+
+                    const shotPath = `${SCREENSHOT_DIR}/${query}-${p.id}.png`;
+                    await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+
+                    const ok = !hasNaN && !hasUndefined && !stuckLoading && persisted;
+                    log(`${ok ? '✅' : '❌'} ${p.label}: NaN=${hasNaN} undefined=${hasUndefined} stuckLoading=${stuckLoading} theme/units-persisted=${persisted} [screenshot: ${shotPath}]`);
+                    if (!ok) f++;
                 }
-                await waitForLoadingClear();
-                await page.waitForTimeout(500); // let the just-populated DOM settle
-
-                const bodyText = await page.locator('body').innerText();
-                const hasNaN = /\bNaN\b/.test(bodyText);
-                const hasUndefined = /\bundefined\b/.test(bodyText);
-                const stuckLoading = await page.locator('#loading').evaluate(el => getComputedStyle(el).display === 'flex').catch(() => false);
-                const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-                const unitActive = await page.locator('.unit-btn.active').getAttribute('data-unit').catch(() => null);
-                const speedActive = await page.locator('.speed-unit-btn.active').getAttribute('data-speed-unit').catch(() => null);
-                const persisted = theme === 'ocean' && unitActive === 'F' && speedActive === 'mph';
-
-                const shotPath = `${SCREENSHOT_DIR}/${query}-${p.id}.png`;
-                await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
-
-                const ok = !hasNaN && !hasUndefined && !stuckLoading && persisted;
-                log(`${ok ? '✅' : '❌'} ${p.label}: NaN=${hasNaN} undefined=${hasUndefined} stuckLoading=${stuckLoading} theme/units-persisted=${persisted} [screenshot: ${shotPath}]`);
-                if (!ok) failures++;
+                await page.close();
+                return f;
+            } catch (error) {
+                log(`❌ Journey for "${query}" failed: ${error.message}`);
+                if (consoleErrors.length) log('Browser console errors:\n```\n' + consoleErrors.slice(0, 20).join('\n') + '\n```');
+                if (failedRequests.length) log('Failed/error API requests (geocoding/Open-Meteo):\n```\n' + failedRequests.slice(0, 20).join('\n') + '\n```');
+                const errorBannerText = await page?.locator('#error').innerText().catch(() => '(unavailable)');
+                log(`Error banner text: "${errorBannerText}"`);
+                await page?.close().catch(() => {});
+                return 1;
             }
-            await ctx.close();
-        } catch (error) {
-            log(`❌ Journey for "${query}" failed: ${error.message}`);
-            if (consoleErrors.length) log('Browser console errors:\n```\n' + consoleErrors.slice(0, 20).join('\n') + '\n```');
-            if (failedRequests.length) log('Failed/error API requests (geocoding/Open-Meteo):\n```\n' + failedRequests.slice(0, 20).join('\n') + '\n```');
-            const errorBannerText = await page?.locator('#error').innerText().catch(() => '(unavailable)');
-            log(`Error banner text: "${errorBannerText}"`);
-            failures++;
-            await ctx?.close().catch(() => {});
-        }
+        });
     }
 
     // 4. Theme screenshots (Coffee, Light) — confirms no low-contrast yellow
     // main numbers on the light cards — plus the interactive tide chart at
     // two different selected times (drag + keyboard), for visual review.
+    // Each gets its own fresh browser too, for the same reason as above.
     log('\n## Theme + tide-chart interaction screenshots');
     for (const theme of ['coffee', 'light']) {
-        let ctx;
+        failures += await withBrowser(async (browser) => {
+            try {
+                const page = await browser.newPage();
+                await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+                await page.waitForSelector('#location-search', { timeout: 10000 });
+                await page.click('#theme-btn');
+                await page.click(`.theme-option[data-theme="${theme}"]`);
+                await page.fill('#location-search', '11561');
+                await page.keyboard.press('Enter');
+                await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
+                await waitForLoadingClear(page);
+                await page.waitForTimeout(500);
+                const shotPath = `${SCREENSHOT_DIR}/theme-${theme}-overview.png`;
+                await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+                log(`✅ ${theme} theme screenshot: ${shotPath}`);
+                await page.close();
+                return 0;
+            } catch (error) {
+                log(`❌ ${theme} theme screenshot failed: ${error.message}`);
+                return 1;
+            }
+        });
+    }
+
+    failures += await withBrowser(async (browser) => {
         try {
-            ctx = await browser.newContext();
-            const page = await ctx.newPage();
+            const page = await browser.newPage();
+            const consoleErrors = [];
+            const failedRequests = [];
+            page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
+            page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`));
+            page.on('requestfailed', req => failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`));
+            page.on('response', res => { if (!res.ok() && (res.url().includes('noaa') || res.url().includes('open-meteo'))) failedRequests.push(`HTTP ${res.status()} ${res.url()}`); });
+
             await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
             await page.waitForSelector('#location-search', { timeout: 10000 });
-            await page.click('#theme-btn');
-            await page.click(`.theme-option[data-theme="${theme}"]`);
             await page.fill('#location-search', '11561');
             await page.keyboard.press('Enter');
+            // Wait for the location to actually resolve (not a fixed sleep) —
+            // navigating away while the geocoding fetch is still in-flight
+            // would have the browser cancel it (net::ERR_ABORTED) before the
+            // selection is saved, which is a test race, not a product bug.
             await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
-            await page.waitForTimeout(2000);
-            const shotPath = `${SCREENSHOT_DIR}/theme-${theme}-overview.png`;
-            await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
-            log(`✅ ${theme} theme screenshot: ${shotPath}`);
-            await ctx.close();
+            await page.waitForTimeout(1000); // let localStorage write settle
+            await page.goto(new URL('tides.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await waitForLoadingClear(page);
+            await page.waitForTimeout(500);
+
+            const tideStationInfo = await page.locator('#tide-station-info').innerText().catch(() => '(unavailable)');
+            const errorBanner = await page.locator('#error').innerText().catch(() => '');
+            log(`Tide station info text: "${tideStationInfo}"`);
+            if (errorBanner) log(`Error banner: "${errorBanner}"`);
+            if (consoleErrors.length) log('Browser console errors:\n```\n' + consoleErrors.slice(0, 20).join('\n') + '\n```');
+            if (failedRequests.length) log('Failed/error API requests (NOAA/Open-Meteo):\n```\n' + failedRequests.slice(0, 20).join('\n') + '\n```');
+
+            const slider = page.locator('#tide-slider');
+            const sliderVisible = await slider.isVisible().catch(() => false);
+            if (sliderVisible) {
+                await slider.focus();
+                await slider.press('Home');
+                await page.waitForTimeout(300);
+                await page.screenshot({ path: `${SCREENSHOT_DIR}/tide-slider-point-1.png`, fullPage: true }).catch(() => {});
+                log(`✅ Tide slider point 1 (start, via keyboard Home): ${SCREENSHOT_DIR}/tide-slider-point-1.png`);
+
+                const max = await slider.getAttribute('max');
+                for (let i = 0; i < 15; i++) await slider.press('ArrowRight');
+                await page.waitForTimeout(300);
+                await page.screenshot({ path: `${SCREENSHOT_DIR}/tide-slider-point-2.png`, fullPage: true }).catch(() => {});
+                log(`✅ Tide slider point 2 (+15 steps via keyboard, max=${max}): ${SCREENSHOT_DIR}/tide-slider-point-2.png`);
+            } else {
+                log('⚠️ Tide slider not visible for this location/time — likely inland or no coastal data; skipping slider screenshots (not a failure).');
+            }
+            await page.close();
+            return 0;
         } catch (error) {
-            log(`❌ ${theme} theme screenshot failed: ${error.message}`);
-            failures++;
-            await ctx?.close().catch(() => {});
+            log(`❌ Tide slider screenshots failed: ${error.message}`);
+            return 1;
         }
-    }
-
-    let finalCtx;
-    try {
-        finalCtx = await browser.newContext();
-        const page = await finalCtx.newPage();
-        const consoleErrors = [];
-        const failedRequests = [];
-        page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
-        page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`));
-        page.on('requestfailed', req => failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`));
-        page.on('response', res => { if (!res.ok() && (res.url().includes('noaa') || res.url().includes('open-meteo'))) failedRequests.push(`HTTP ${res.status()} ${res.url()}`); });
-
-        await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await page.waitForSelector('#location-search', { timeout: 10000 });
-        await page.fill('#location-search', '11561');
-        await page.keyboard.press('Enter');
-        // Wait for the location to actually resolve (not a fixed sleep) —
-        // navigating away while the geocoding fetch is still in-flight
-        // would have the browser cancel it (net::ERR_ABORTED) before the
-        // selection is saved, which is a test race, not a product bug.
-        await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
-        await page.waitForTimeout(1000); // let localStorage write settle
-        await page.goto(new URL('tides.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await page.waitForFunction(
-            () => document.getElementById('loading') === null || getComputedStyle(document.getElementById('loading')).display !== 'flex',
-            null,
-            { timeout: 18000 }
-        ).catch(() => {});
-        await page.waitForTimeout(500);
-
-        const tideStationInfo = await page.locator('#tide-station-info').innerText().catch(() => '(unavailable)');
-        const errorBanner = await page.locator('#error').innerText().catch(() => '');
-        log(`Tide station info text: "${tideStationInfo}"`);
-        if (errorBanner) log(`Error banner: "${errorBanner}"`);
-        if (consoleErrors.length) log('Browser console errors:\n```\n' + consoleErrors.slice(0, 20).join('\n') + '\n```');
-        if (failedRequests.length) log('Failed/error API requests (NOAA/Open-Meteo):\n```\n' + failedRequests.slice(0, 20).join('\n') + '\n```');
-
-        const slider = page.locator('#tide-slider');
-        const sliderVisible = await slider.isVisible().catch(() => false);
-        if (sliderVisible) {
-            await slider.focus();
-            await slider.press('Home');
-            await page.waitForTimeout(300);
-            await page.screenshot({ path: `${SCREENSHOT_DIR}/tide-slider-point-1.png`, fullPage: true }).catch(() => {});
-            log(`✅ Tide slider point 1 (start, via keyboard Home): ${SCREENSHOT_DIR}/tide-slider-point-1.png`);
-
-            const max = await slider.getAttribute('max');
-            for (let i = 0; i < 15; i++) await slider.press('ArrowRight');
-            await page.waitForTimeout(300);
-            await page.screenshot({ path: `${SCREENSHOT_DIR}/tide-slider-point-2.png`, fullPage: true }).catch(() => {});
-            log(`✅ Tide slider point 2 (+15 steps via keyboard, max=${max}): ${SCREENSHOT_DIR}/tide-slider-point-2.png`);
-        } else {
-            log('⚠️ Tide slider not visible for this location/time — likely inland or no coastal data; skipping slider screenshots (not a failure).');
-        }
-        await finalCtx.close();
-    } catch (error) {
-        log(`❌ Tide slider screenshots failed: ${error.message}`);
-        failures++;
-        await finalCtx?.close().catch(() => {});
-    }
-
-    await browser.close();
+    });
 
     log(`\n## Result: ${failures === 0 ? '✅ ALL CHECKS PASSED' : `❌ ${failures} CHECK(S) FAILED`}`);
 

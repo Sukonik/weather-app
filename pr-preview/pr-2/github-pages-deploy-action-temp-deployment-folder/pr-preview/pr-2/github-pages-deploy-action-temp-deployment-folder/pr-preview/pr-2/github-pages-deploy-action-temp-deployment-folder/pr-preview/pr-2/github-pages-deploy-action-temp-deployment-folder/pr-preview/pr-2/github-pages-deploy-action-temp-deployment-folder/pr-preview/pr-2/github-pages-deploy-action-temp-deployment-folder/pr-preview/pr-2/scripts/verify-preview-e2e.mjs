@@ -107,7 +107,11 @@ async function main() {
 
             await page.fill('#location-search', query);
             await page.keyboard.press('Enter');
-            await page.waitForTimeout(6000); // allow real network round-trip
+            // Wait for the location to actually resolve before navigating —
+            // a fixed sleep can fire while the geocoding fetch is still
+            // in-flight, and the subsequent nav-click cancels it.
+            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, { timeout: 15000 });
+            await page.waitForTimeout(2000); // let the weather/AQI fetches that location-selection kicks off get underway
 
             for (const p of PAGES) {
                 if (p.id !== 'overview') {
