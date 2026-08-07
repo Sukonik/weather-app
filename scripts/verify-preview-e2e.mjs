@@ -139,6 +139,24 @@ async function main() {
         { timeout: 18000 }
     ).catch(() => {}); // if it's genuinely stuck, fall through and let the stuckLoading check report it
 
+    // A query like "10001" (a bare US ZIP with no state/country) can
+    // legitimately resolve to more than one candidate world-wide (New York
+    // NY, a town in Spain, one in France, ...) — the app correctly shows
+    // its disambiguation picker instead of auto-selecting, exactly as it
+    // would for a real user. #location-summary only fills in once a
+    // picker choice is made, so the test has to drive that same picker
+    // rather than assuming every search auto-resolves.
+    const resolveSearch = async (page) => {
+        const picked = await Promise.race([
+            page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 }).then(() => 'summary'),
+            page.waitForSelector('#location-picker-modal.active', { timeout: 22000 }).then(() => 'picker')
+        ]);
+        if (picked === 'picker') {
+            await page.click('.location-picker-item[data-index="0"]');
+            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 15000 });
+        }
+    };
+
     // 3. Search on Overview, then navigate to every other page via the nav
     // menu (not a direct URL) to prove location/theme/units persist —
     // screenshotting each of the 7 pages along the way. Each query gets its
@@ -175,7 +193,7 @@ async function main() {
                 // once more (another ~8s + backoff) before giving up, so the
                 // real-world worst case is ~16-17s on a slow/flaky network —
                 // the wait here must comfortably exceed that.
-                await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
+                await resolveSearch(page);
                 await waitForLoadingClear(page);
 
                 let f = 0;
@@ -234,7 +252,7 @@ async function main() {
                 await page.click(`.theme-option[data-theme="${theme}"]`);
                 await page.fill('#location-search', '11561');
                 await page.keyboard.press('Enter');
-                await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
+                await resolveSearch(page);
                 await waitForLoadingClear(page);
                 await page.waitForTimeout(500);
                 const shotPath = `${SCREENSHOT_DIR}/theme-${theme}-overview.png`;
@@ -268,7 +286,7 @@ async function main() {
             // navigating away while the geocoding fetch is still in-flight
             // would have the browser cancel it (net::ERR_ABORTED) before the
             // selection is saved, which is a test race, not a product bug.
-            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 22000 });
+            await resolveSearch(page);
             await page.waitForTimeout(1000); // let localStorage write settle
             await page.goto(new URL('tides.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
             await waitForLoadingClear(page);
