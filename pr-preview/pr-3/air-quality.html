@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
+    <title>Air Quality — ClearSky</title>
+    <link rel="stylesheet" href="styles.css?v=20260808a">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="loading" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <span>Loading air quality data...</span>
+    </div>
+    <div id="error" class="error-message"></div>
+    <div class="container">
+        <div id="app-chrome"></div>
+
+        <main>
+            <div class="page-hero aqi-hero">
+                <h2 class="section-label">Air Quality</h2>
+                <div class="page-hero-value" id="aqi-page-value">--</div>
+                <div class="page-hero-status" id="aqi-page-status">--</div>
+                <div class="page-hero-sub" id="aqi-eu-value">European AQI: --</div>
+            </div>
+
+            <div class="stat-grid">
+                <div class="detail-card">
+                    <div class="card-header"><i class="fas fa-smog"></i><span>PM2.5</span></div>
+                    <div class="card-value" id="pm25-value">--</div>
+                    <div class="card-description">µg/m³</div>
+                </div>
+                <div class="detail-card">
+                    <div class="card-header"><i class="fas fa-smog"></i><span>PM10</span></div>
+                    <div class="card-value" id="pm10-value">--</div>
+                    <div class="card-description">µg/m³</div>
+                </div>
+                <div class="detail-card">
+                    <div class="card-header"><i class="fas fa-sun"></i><span>Ozone (O₃)</span></div>
+                    <div class="card-value" id="o3-value">--</div>
+                    <div class="card-description">µg/m³</div>
+                </div>
+                <div class="detail-card">
+                    <div class="card-header"><i class="fas fa-car"></i><span>NO₂</span></div>
+                    <div class="card-value" id="no2-value">--</div>
+                    <div class="card-description">µg/m³</div>
+                </div>
+                <div class="detail-card">
+                    <div class="card-header"><i class="fas fa-industry"></i><span>SO₂</span></div>
+                    <div class="card-value" id="so2-value">--</div>
+                    <div class="card-description">µg/m³</div>
+                </div>
+                <div class="detail-card">
+                    <div class="card-header"><i class="fas fa-fire"></i><span>CO</span></div>
+                    <div class="card-value" id="co-value">--</div>
+                    <div class="card-description">µg/m³</div>
+                </div>
+            </div>
+
+            <div class="hourly-card">
+                <div class="card-header-row">
+                    <h3>24-HOUR US AQI</h3>
+                    <button class="info-btn" id="aqi-info-btn"><i class="fas fa-info-circle"></i></button>
+                </div>
+                <canvas id="aqi-chart" width="600" height="220"></canvas>
+            </div>
+
+            <div class="data-footer" id="data-footer">
+                <i class="fas fa-database"></i>
+                <span id="data-source-text">Source: Open-Meteo Air Quality API</span>
+                <span class="data-footer-sep">·</span>
+                <span id="data-timestamp-text">Updated: --</span>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="aqi-info-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🌫️ Air Pollutant Quick Guide</h3>
+                <button class="close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="pollutant-guide">
+                    <div class="guide-item"><h4>PM2.5 – 🛻🔥 (combustion)</h4><p>Fine particles from exhaust, smoke, wildfires. Affects lungs & heart.</p></div>
+                    <div class="guide-item"><h4>PM10 – 🌾💨 (dust & pollen)</h4><p>Coarse particles like dust, mold, and pollen. Irritates airways.</p></div>
+                    <div class="guide-item"><h4>Ozone (O₃) – ☀️🏙️ (sun + smog)</h4><p>Forms in sunlight. Irritates lungs, especially during summer.</p></div>
+                    <div class="guide-item"><h4>NO₂ – 🚗💨 (traffic fumes)</h4><p>From car engines and power plants. Worsens asthma.</p></div>
+                    <div class="guide-item"><h4>SO₂ – 🏭⚠️ (industrial gas)</h4><p>Burning coal/oil. Triggers coughing and breathing trouble.</p></div>
+                    <div class="guide-item"><h4>CO – 🔥🫁 (incomplete burning)</h4><p>From cars, stoves, and heaters. Blocks oxygen to the body.</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/pages/air-quality.js?v=20260808a"></script>
+</body>
+</html>

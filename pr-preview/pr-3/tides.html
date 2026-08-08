@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
+    <title>Tide Charts — ClearSky</title>
+    <link rel="stylesheet" href="styles.css?v=20260808a">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="loading" class="loading-overlay"><div class="loading-spinner"></div><span>Loading tide data...</span></div>
+    <div id="error" class="error-message"></div>
+    <div class="container">
+        <div id="app-chrome"></div>
+
+        <main>
+            <div id="tides-content">
+                <div class="page-hero">
+                    <h2 class="section-label">Tide Charts</h2>
+                    <div class="page-hero-sub" id="tide-station-info">Select a location to load coastal conditions.</div>
+                </div>
+
+                <div class="stat-grid" id="tide-next-events" style="display:none;">
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-arrow-trend-up"></i><span>NEXT HIGH TIDE</span></div>
+                        <div class="card-value" id="next-high-value">--</div>
+                        <div class="card-description" id="next-high-height">--</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-arrow-trend-down"></i><span>NEXT LOW TIDE</span></div>
+                        <div class="card-value" id="next-low-value">--</div>
+                        <div class="card-description" id="next-low-height">--</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-water"></i><span>WATER LEVEL</span></div>
+                        <div class="card-value" id="water-level-value">--</div>
+                        <div class="card-description" id="water-level-source">--</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-temperature-half"></i><span>WATER TEMP</span></div>
+                        <div class="card-value" id="water-temp-value">--</div>
+                        <div class="card-description" id="water-temp-source">--</div>
+                    </div>
+                </div>
+
+                <div class="hourly-card" id="tide-curve-card" style="display:none;">
+                    <div class="card-header-row">
+                        <h3>TIDE CURVE</h3>
+                        <div class="range-toggle" role="group" aria-label="Chart range">
+                            <button class="time-btn range-btn active" data-range="24" type="button">24H</button>
+                            <button class="time-btn range-btn" data-range="48" type="button">48H</button>
+                        </div>
+                    </div>
+                    <canvas id="tide-chart" width="640" height="240" aria-hidden="true"></canvas>
+                    <label class="tide-slider-label" for="tide-slider" id="tide-slider-label">Selected time on tide chart</label>
+                    <input type="range" id="tide-slider" class="tide-slider" min="0" max="0" step="1" value="0"
+                        aria-labelledby="tide-slider-label">
+                    <div class="tide-selected-panel" id="tide-selected-panel">
+                        <div class="tide-selected-row"><span class="tsp-label">Time</span><span class="tsp-value" id="tsp-time">--</span></div>
+                        <div class="tide-selected-row"><span class="tsp-label">Height</span><span class="tsp-value" id="tsp-height">--</span></div>
+                        <div class="tide-selected-row"><span class="tsp-label">Trend</span><span class="tsp-value" id="tsp-trend">--</span></div>
+                        <div class="tide-selected-row"><span class="tsp-label">Change from previous</span><span class="tsp-value" id="tsp-diff">--</span></div>
+                        <div class="tide-selected-row"><span class="tsp-label">Next high/low in</span><span class="tsp-value" id="tsp-next">--</span></div>
+                        <div class="tide-selected-row"><span class="tsp-label">Source</span><span class="tsp-value" id="tsp-source">--</span></div>
+                    </div>
+                    <div class="sr-only" aria-live="polite" id="tide-announce"></div>
+                </div>
+
+                <div class="stat-grid" id="marine-stats" style="display:none;">
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-water"></i><span>WAVE HEIGHT</span></div>
+                        <div class="card-value" id="wave-height-value">--</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-wave-square"></i><span>WAVE PERIOD / DIRECTION</span></div>
+                        <div class="card-value" id="wave-period-value">--</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-temperature-half"></i><span>SEA SURFACE TEMP</span></div>
+                        <div class="card-value" id="sst-value">--</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="card-header"><i class="fas fa-arrows-turn-to-dots"></i><span>OCEAN CURRENT</span></div>
+                        <div class="card-value" id="current-value">--</div>
+                    </div>
+                </div>
+
+                <div class="modeled-warning" id="modeled-warning" style="display:none;">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span>Modeled data — not an official navigation product. Accuracy near the coastline is limited; for navigation use official NOAA or national hydrographic products.</span>
+                </div>
+
+                <div class="inland-message" id="inland-message" style="display:none;">
+                    <i class="fas fa-mountain"></i>
+                    <span>Coastal data unavailable for this location.</span>
+                </div>
+
+                <div class="data-footer" id="data-footer">
+                    <i class="fas fa-database"></i>
+                    <span id="data-source-text">Source: --</span>
+                    <span class="data-footer-sep">·</span>
+                    <span id="data-timestamp-text">Updated: --</span>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script type="module" src="js/pages/tides.js?v=20260808a"></script>
+</body>
+</html>
