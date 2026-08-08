@@ -304,6 +304,14 @@ input:focus-visible,
     align-items: center;
     margin-bottom: 3rem;
     padding: 1rem;
+    text-decoration: none;
+    color: inherit;
+    border-radius: var(--radius-sm);
+    transition: opacity 0.2s;
+}
+
+.app-logo:hover {
+    opacity: 0.85;
 }
 
 .logo-icon {
@@ -522,7 +530,7 @@ header {
 .nav-dropdown {
     position: absolute;
     top: 100%;
-    right: 0;
+    left: 0;
     margin-top: 0.5rem;
     background-color: var(--secondary-bg);
     border: 1px solid var(--card-border);
@@ -530,7 +538,13 @@ header {
     padding: 0.5rem;
     display: none;
     z-index: 1000;
+    width: max-content;
     min-width: 190px;
+    /* Left-anchored on its own button (not the far edge of a full-width
+       row), so it never needs viewport-edge math to stay on-screen — but
+       clamp it anyway as a safety net on very narrow phones. */
+    max-width: calc(100vw - 2 * var(--space-4));
+    box-sizing: border-box;
     box-shadow: var(--shadow-md);
 }
 
@@ -1938,11 +1952,6 @@ button:hover {
         left: 0;
         right: auto;
         min-width: 180px;
-    }
-
-    .nav-dropdown {
-        right: 0;
-        left: auto;
     }
 
     .quick-locations {
