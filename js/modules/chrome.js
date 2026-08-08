@@ -104,13 +104,19 @@ function chromeTemplate(activePage) {
     const themeOptions = ['dark', 'light', 'ocean', 'jungle', 'sunset', 'coffee'];
     const themeIcons = { dark: 'fa-moon', light: 'fa-sun', ocean: 'fa-water', jungle: 'fa-leaf', sunset: 'fa-cloud-sun', coffee: 'fa-mug-hot' };
     return `
-        <div class="app-logo">
+        <a class="app-logo" href="index.html" aria-label="ClearSky home">
             <div class="logo-icon"><div class="sun-circle"></div><div class="sun-rays"></div></div>
             <div class="logo-text"><h1>ClearSky</h1><span>Weather App</span></div>
-        </div>
+        </a>
         <header>
             <div class="top-bar">
                 <div class="left-section">
+                    <div class="nav-selector">
+                        <button id="nav-btn" class="theme-btn nav-btn" aria-label="Menu" aria-haspopup="true" aria-expanded="false"><i class="fas fa-bars"></i></button>
+                        <div class="nav-dropdown" id="nav-dropdown">
+                            ${PAGES.map(p => `<a class="nav-option${p.id === activePage ? ' active' : ''}" href="${p.href}"><i class="fas ${p.icon}"></i> ${p.label}</a>`).join('')}
+                        </div>
+                    </div>
                     <div class="theme-selector">
                         <button id="theme-btn" class="theme-btn"><i class="fas fa-palette"></i><span>Theme</span></button>
                         <div class="theme-dropdown">
@@ -137,12 +143,6 @@ function chromeTemplate(activePage) {
                         <div class="length-units">
                             <button class="length-unit-btn" data-length-unit="ft">ft</button><span class="separator">|</span>
                             <button class="length-unit-btn" data-length-unit="m">m</button>
-                        </div>
-                    </div>
-                    <div class="nav-selector">
-                        <button id="nav-btn" class="theme-btn nav-btn" aria-label="Menu"><i class="fas fa-bars"></i></button>
-                        <div class="nav-dropdown" id="nav-dropdown">
-                            ${PAGES.map(p => `<a class="nav-option${p.id === activePage ? ' active' : ''}" href="${p.href}"><i class="fas ${p.icon}"></i> ${p.label}</a>`).join('')}
                         </div>
                     </div>
                 </div>
@@ -295,11 +295,18 @@ export function initChrome({ page = 'overview' } = {}) {
     // Nav dropdown
     const navBtn = mount.querySelector('#nav-btn');
     const navDropdown = mount.querySelector('#nav-dropdown');
-    navBtn.addEventListener('click', (e) => { e.stopPropagation(); navDropdown.classList.toggle('active'); });
+    navBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isActive = navDropdown.classList.toggle('active');
+        navBtn.setAttribute('aria-expanded', String(isActive));
+    });
 
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.theme-selector')) themeDropdown.classList.remove('active');
-        if (!e.target.closest('.nav-selector')) navDropdown.classList.remove('active');
+        if (!e.target.closest('.nav-selector')) {
+            navDropdown.classList.remove('active');
+            navBtn.setAttribute('aria-expanded', 'false');
+        }
     });
 
     // Unit toggles
