@@ -114,11 +114,11 @@ function chromeTemplate(activePage) {
                     <div class="nav-selector">
                         <button id="nav-btn" class="theme-btn nav-btn" aria-label="Menu" aria-haspopup="true" aria-expanded="false"><i class="fas fa-bars"></i></button>
                         <div class="nav-dropdown" id="nav-dropdown">
-                            ${PAGES.map(p => `<a class="nav-option${p.id === activePage ? ' active' : ''}" href="${p.href}"><i class="fas ${p.icon}"></i> ${p.label}</a>`).join('')}
+                            ${PAGES.map(p => `<a class="nav-option${p.id === activePage ? ' active' : ''}" href="${p.href}"${p.id === activePage ? ' aria-current="page"' : ''}><i class="fas ${p.icon}"></i> ${p.label}</a>`).join('')}
                         </div>
                     </div>
                     <div class="theme-selector">
-                        <button id="theme-btn" class="theme-btn"><i class="fas fa-palette"></i><span>Theme</span></button>
+                        <button id="theme-btn" class="theme-btn" aria-label="Theme" aria-haspopup="true" aria-expanded="false"><i class="fas fa-palette"></i><span>Theme</span></button>
                         <div class="theme-dropdown">
                             ${themeOptions.map(t => `<button class="theme-option" data-theme="${t}"><i class="fas ${themeIcons[t]}"></i> ${t[0].toUpperCase()}${t.slice(1)}</button>`).join('')}
                         </div>
@@ -284,28 +284,61 @@ export function initChrome({ page = 'overview' } = {}) {
     updateClock(mount);
     setInterval(() => updateClock(mount), 1000);
 
-    // Theme dropdown
+    // Theme and Menu dropdowns are mutually exclusive: opening one always
+    // closes the other, Escape closes whichever is open and returns focus
+    // to its trigger button, and a click outside either closes both.
     const themeBtn = mount.querySelector('#theme-btn');
     const themeDropdown = mount.querySelector('.theme-dropdown');
-    themeBtn.addEventListener('click', (e) => { e.stopPropagation(); themeDropdown.classList.toggle('active'); });
-    mount.querySelectorAll('.theme-option').forEach(opt => {
-        opt.addEventListener('click', () => { applyTheme(opt.dataset.theme); themeDropdown.classList.remove('active'); });
-    });
-
-    // Nav dropdown
     const navBtn = mount.querySelector('#nav-btn');
     const navDropdown = mount.querySelector('#nav-dropdown');
+
+    function closeThemeDropdown() {
+        themeDropdown.classList.remove('active');
+        themeBtn.setAttribute('aria-expanded', 'false');
+    }
+    function closeNavDropdown() {
+        navDropdown.classList.remove('active');
+        navBtn.setAttribute('aria-expanded', 'false');
+    }
+    function openThemeDropdown() {
+        closeNavDropdown();
+        themeDropdown.classList.add('active');
+        themeBtn.setAttribute('aria-expanded', 'true');
+    }
+    function openNavDropdown() {
+        closeThemeDropdown();
+        navDropdown.classList.add('active');
+        navBtn.setAttribute('aria-expanded', 'true');
+    }
+
+    themeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (themeDropdown.classList.contains('active')) closeThemeDropdown();
+        else openThemeDropdown();
+    });
+    mount.querySelectorAll('.theme-option').forEach(opt => {
+        opt.addEventListener('click', () => { applyTheme(opt.dataset.theme); closeThemeDropdown(); });
+    });
+
     navBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const isActive = navDropdown.classList.toggle('active');
-        navBtn.setAttribute('aria-expanded', String(isActive));
+        if (navDropdown.classList.contains('active')) closeNavDropdown();
+        else openNavDropdown();
     });
 
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.theme-selector')) themeDropdown.classList.remove('active');
-        if (!e.target.closest('.nav-selector')) {
-            navDropdown.classList.remove('active');
-            navBtn.setAttribute('aria-expanded', 'false');
+        if (!e.target.closest('.theme-selector')) closeThemeDropdown();
+        if (!e.target.closest('.nav-selector')) closeNavDropdown();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (themeDropdown.classList.contains('active')) {
+            closeThemeDropdown();
+            themeBtn.focus();
+        } else if (navDropdown.classList.contains('active')) {
+            closeNavDropdown();
+            navBtn.focus();
         }
     });
 
