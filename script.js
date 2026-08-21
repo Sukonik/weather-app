@@ -111,8 +111,13 @@ try {
             if (!strip || !data.hourly?.time?.length) return;
             const { unit } = getUnits();
 
+            // Bug: comparing the ISO time string directly against the epoch
+            // number `now` coerces the string via ToNumber (always NaN), so
+            // `t >= now` was always false — findIndex always returned -1,
+            // silently falling back to the dataset's first hour (midnight)
+            // instead of the current local hour. Parse to a timestamp first.
             const now = Date.now();
-            let startIdx = data.hourly.time.findIndex(t => t >= now);
+            let startIdx = data.hourly.time.findIndex(t => new Date(t).getTime() >= now);
             if (startIdx < 0) startIdx = 0;
 
             const count = 16;
