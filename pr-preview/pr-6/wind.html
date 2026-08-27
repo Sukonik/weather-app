@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
+    <title>Wind Data — ClearSky</title>
+    <link rel="stylesheet" href="styles.css?v=20260821b">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="loading" class="loading-overlay"><div class="loading-spinner"></div><span>Loading wind data...</span></div>
+    <div id="error" class="error-message"></div>
+    <div class="container">
+        <div id="app-chrome"></div>
+
+        <main>
+            <div class="page-hero wind-hero">
+                <h2 class="section-label">Wind</h2>
+                <div class="wind-hero-row">
+                    <div class="compass" id="wind-compass">
+                        <i class="fas fa-location-arrow compass-arrow" id="compass-arrow"></i>
+                    </div>
+                    <div class="wind-hero-values">
+                        <div class="page-hero-value" id="wind-speed-value">-- km/h</div>
+                        <div class="page-hero-sub" id="wind-direction-value">-- (--°)</div>
+                        <div class="page-hero-sub" id="wind-gust-value">Gusts: --</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hourly-card">
+                <div class="card-header-row"><h3>24-HOUR WIND SPEED</h3></div>
+                <canvas id="wind-chart" width="600" height="220"></canvas>
+                <div class="wind-legend">
+                    <span class="legend-item">Light (&lt;20)</span>
+                    <span class="legend-item">Moderate (20–40)</span>
+                    <span class="legend-item">Strong (&gt;40)</span>
+                </div>
+            </div>
+
+            <div class="data-footer" id="data-footer">
+                <i class="fas fa-database"></i>
+                <span id="data-source-text">Source: Open-Meteo Forecast API</span>
+                <span class="data-footer-sep">·</span>
+                <span id="data-timestamp-text">Updated: --</span>
+            </div>
+        </main>
+    </div>
+    <script type="module" src="js/pages/wind.js?v=20260821b"></script>
+</body>
+</html>

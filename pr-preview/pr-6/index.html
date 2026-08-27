@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
+    <title>ClearSky Weather App</title>
+    <link rel="stylesheet" href="styles.css?v=20260821b">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="loading" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <span>Loading weather data...</span>
+    </div>
+    <div id="error" class="error-message"></div>
+    <div class="container">
+        <div id="app-chrome"></div>
+
+        <main>
+            <div class="current-weather">
+                <h1 class="location">Loading...</h1>
+                <div class="hero-main">
+                    <i id="weather-icon" class="fas fa-cloud hero-icon"></i>
+                    <div class="temperature-container">
+                        <span class="temperature">--</span>
+                        <span class="unit">°C</span>
+                    </div>
+                </div>
+                <div class="weather-description">
+                    <span class="condition">--</span>
+                    <span class="feels-like">Feels like: --°</span>
+                </div>
+                <div class="hilo-row">
+                    <span class="hilo hilo-high"><i class="fas fa-arrow-up"></i><span id="temp-high">--°</span></span>
+                    <span class="hilo-sep">·</span>
+                    <span class="hilo hilo-low"><i class="fas fa-arrow-down"></i><span id="temp-low">--°</span></span>
+                </div>
+            </div>
+
+            <div class="hourly-strip-section">
+                <h2 class="section-label">Hourly Forecast</h2>
+                <div class="hourly-strip" id="hourly-strip"></div>
+            </div>
+
+            <div class="weather-details">
+                <div class="detail-item">
+                    <i class="fas fa-wind"></i>
+                    <span class="label">Wind</span>
+                    <span class="value" id="wind">-- km/h</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-droplet"></i>
+                    <span class="label">Humidity</span>
+                    <span class="value" id="humidity">--%</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-cloud-rain"></i>
+                    <span class="label">Precipitation</span>
+                    <span class="value" id="precipitation">-- mm</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-sun"></i>
+                    <span class="label">UV Index</span>
+                    <span class="value" id="uv-index">--</span>
+                </div>
+            </div>
+
+            <div class="weather-details more-conditions">
+                <div class="detail-item">
+                    <i class="fas fa-temperature-low"></i>
+                    <span class="label">Dew Point</span>
+                    <span class="value" id="dew-point">--</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-gauge-high"></i>
+                    <span class="label">Pressure</span>
+                    <span class="value" id="pressure">--</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-cloud"></i>
+                    <span class="label">Cloud Cover</span>
+                    <span class="value" id="cloud-cover">--</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-arrow-up-from-ground-water"></i>
+                    <span class="label">Sunrise</span>
+                    <span class="value" id="sunrise-value">--</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-arrow-down-to-line"></i>
+                    <span class="label">Sunset</span>
+                    <span class="value" id="sunset-value">--</span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-snowflake"></i>
+                    <span class="label">Rain / Showers / Snow</span>
+                    <span class="value" id="precip-breakdown">--</span>
+                </div>
+            </div>
+
+            <div class="hourly-section">
+                <div class="hourly-card precipitation">
+                    <h3>HOURLY PRECIPITATION</h3>
+                    <div class="value-display">
+                        <span id="precip-probability">--%</span>
+                        <span class="label">Chance of Rain</span>
+                    </div>
+                    <canvas id="precipCanvas" width="300" height="200"></canvas>
+                    <div class="time-display">
+                        <span id="precip-time">--:-- --</span>
+                    </div>
+                    <div class="time-controls">
+                        <button id="precip-current" class="time-btn active">Current Hour</button>
+                        <button id="precip-forecast" class="time-btn">Next 8 Hours</button>
+                    </div>
+                </div>
+
+                <div class="hourly-card wind">
+                    <h3>HOURLY WIND</h3>
+                    <div class="value-display">
+                        <span id="wind-speed">-- km/h</span>
+                        <span id="wind-direction" class="direction">--</span>
+                        <span class="label">Current Wind Speed</span>
+                    </div>
+                    <canvas id="windCanvas" width="300" height="200"></canvas>
+                    <div class="wind-legend">
+                        <span class="legend-item">Light</span>
+                        <span class="legend-item">Moderate</span>
+                        <span class="legend-item">Strong</span>
+                    </div>
+                    <div class="time-display">
+                        <span id="wind-time">--:-- --</span>
+                    </div>
+                    <div class="time-controls">
+                        <button id="wind-current" class="time-btn active">Current Hour</button>
+                        <button id="wind-forecast" class="time-btn">Next 8 Hours</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detailed-cards">
+                <div class="detail-card precipitation-card">
+                    <div class="card-header">
+                        <i class="fas fa-cloud-rain"></i>
+                        <span>PRECIPITATION</span>
+                    </div>
+                    <div class="card-value" id="precipitation-chance">--%</div>
+                    <div class="card-description" id="precipitation-desc">--</div>
+                </div>
+
+                <div class="detail-card air-quality-card">
+                    <div class="card-header">
+                        <button class="info-btn" id="aqi-info-btn">
+                            <i class="fas fa-info-circle"></i>
+                        </button>
+                        <i class="fas fa-wind"></i>
+                        <span>AIR QUALITY</span>
+                    </div>
+                    <div class="card-value" id="air-quality-value">--</div>
+                    <div class="card-description">US AQI</div>
+                    <div class="card-status" id="air-quality-status">--</div>
+                    <div class="card-pollutants" id="air-quality-pollutants"></div>
+                </div>
+
+                <!-- Air Quality Info Modal -->
+                <div class="modal" id="aqi-info-modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>🌫️ Air Pollutant Quick Guide</h3>
+                            <button class="close-btn">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="pollutant-guide">
+                                <div class="guide-item">
+                                    <h4>PM2.5 – 🛻🔥 (combustion)</h4>
+                                    <p>Fine particles from exhaust, smoke, wildfires. Affects lungs & heart.</p>
+                                </div>
+                                <div class="guide-item">
+                                    <h4>PM10 – 🌾💨 (dust & pollen)</h4>
+                                    <p>Coarse particles like dust, mold, and pollen. Irritates airways.</p>
+                                </div>
+                                <div class="guide-item">
+                                    <h4>Ozone (O₃) – ☀️🏙️ (sun + smog)</h4>
+                                    <p>Forms in sunlight. Irritates lungs, especially during summer.</p>
+                                </div>
+                                <div class="guide-item">
+                                    <h4>NO₂ – 🚗💨 (traffic fumes)</h4>
+                                    <p>From car engines and power plants. Worsens asthma.</p>
+                                </div>
+                                <div class="guide-item">
+                                    <h4>SO₂ – 🏭⚠️ (industrial gas)</h4>
+                                    <p>Burning coal/oil. Triggers coughing and breathing trouble.</p>
+                                </div>
+                                <div class="guide-item">
+                                    <h4>CO – 🔥🫁 (incomplete burning)</h4>
+                                    <p>From cars, stoves, and heaters. Blocks oxygen to the body.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-card uv-card">
+                    <div class="card-header">
+                        <i class="fas fa-sun"></i>
+                        <span>UV INDEX</span>
+                    </div>
+                    <div class="card-value" id="uv-index-value">--</div>
+                    <div class="card-description">Daytime UV</div>
+                    <div class="card-status" id="uv-index-status">--</div>
+                </div>
+
+                <div class="detail-card visibility-card">
+                    <div class="card-header">
+                        <i class="fas fa-eye"></i>
+                        <span>VISIBILITY</span>
+                    </div>
+                    <div class="card-value" id="visibility-value">-- km</div>
+                    <div class="card-status" id="visibility-status">--</div>
+                </div>
+            </div>
+
+            <div class="data-footer" id="data-footer">
+                <i class="fas fa-database"></i>
+                <span id="data-source-text">Source: Open-Meteo</span>
+                <span class="data-footer-sep">·</span>
+                <span id="data-timestamp-text">Updated: --</span>
+            </div>
+        </main>
+    </div>
+    <script type="module" src="script.js?v=20260821b"></script>
+</body>
+</html>
