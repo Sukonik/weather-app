@@ -139,6 +139,178 @@ export function formatLocationDetail(loc) {
     return bits.join(', ') || (loc.featureCode === 'PCLI' ? 'Country' : '');
 }
 
+// ---------------------------------------------------------------------
+// Favorites management: removing/restoring defaults, adding/removing
+// custom (user-searched) favorites, all persisted locally. Versioned so
+// a future schema change has somewhere to migrate from, and every read
+// is wrapped so corrupted or pre-existing data can never leave the menu
+// unusable — it just falls back to "nothing customized yet".
+// ---------------------------------------------------------------------
+const FAVORITES_STORAGE_KEY = 'clearsky_favorites_v1';
+const FAVORITES_VERSION = 1;
+
+function emptyFavoritesState() {
+    return { version: FAVORITES_VERSION, removedDefaultIds: [], customFavorites: [] };
+}
+
+function loadFavoritesState() {
+    try {
+        const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+        if (!raw) return emptyFavoritesState();
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return emptyFavoritesState();
+        const removedDefaultIds = Array.isArray(parsed.removedDefaultIds)
+            ? parsed.removedDefaultIds.filter(id => typeof id === 'string' && id !== 'fav-long-beach-ny')
+            : [];
+        const customFavorites = Array.isArray(parsed.customFavorites)
+            ? parsed.customFavorites.filter(f => f && typeof f.id === 'string' && typeof f.latitude === 'number' && typeof f.longitude === 'number')
+            : [];
+        return { version: FAVORITES_VERSION, removedDefaultIds, customFavorites };
+    } catch {
+        // Corrupted JSON or a pre-versioning shape we don't recognize —
+        // never leave the menu unusable, just start clean. Long Beach is
+        // always restored automatically since it's never in this state.
+        return emptyFavoritesState();
+    }
+}
+
+function saveFavoritesState(state) {
+    try {
+        localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(state));
+    } catch {
+        // ignore storage errors (private browsing, quota, etc.)
+    }
+}
+
+const COORD_MATCH_DEGREES = 0.05; // ~5km — enough to treat "the same place" as a dupe/match
+
+function sameCoords(a, b) {
+    return Math.abs(a.latitude - b.latitude) < COORD_MATCH_DEGREES && Math.abs(a.longitude - b.longitude) < COORD_MATCH_DEGREES;
+}
+
+/** A default favorite this location actually is, if any — matched by its
+ * stable id (e.g. it came from a favorite click or a canonical alias) or,
+ * failing that, by close-enough coordinates (a live geocoding search that
+ * happens to land on the same place, e.g. "Long Beach, NY 11561" typed by
+ * hand). Used to keep the heart button and favorites list from ever
+ * showing the same real-world place as both a default and a duplicate
+ * custom entry. */
+function findMatchingDefault(loc) {
+    if (!loc) return null;
+    return FAVORITE_LOCATIONS.find(f => f.id === loc.id) || FAVORITE_LOCATIONS.find(f => sameCoords(f, loc));
+}
+
+/** True if `loc` is the permanent Home favorite (Long Beach) — used to
+ * keep the heart button from offering to remove the one favorite that can
+ * never actually be removed. */
+export function isPermanentFavorite(loc) {
+    return findMatchingDefault(loc)?.permanent === true;
+}
+
+/** The favorites actually shown in the menu right now: defaults minus any
+ * the user removed (Long Beach can never be among them), plus their
+ * custom saved locations, in that order. */
+export function getVisibleFavorites() {
+    const state = loadFavoritesState();
+    const defaults = FAVORITE_LOCATIONS.filter(f => f.permanent || !state.removedDefaultIds.includes(f.id));
+    return [...defaults, ...state.customFavorites];
+}
+
+export function isRemovedDefault(id) {
+    return loadFavoritesState().removedDefaultIds.includes(id);
+}
+
+/** true if this location (by id or coordinates) is currently a visible
+ * favorite — drives the ♡/♥ heart button. */
+export function isFavorite(loc) {
+    if (!loc) return false;
+    const match = findMatchingDefault(loc);
+    if (match) return match.permanent || !isRemovedDefault(match.id);
+    const state = loadFavoritesState();
+    return state.customFavorites.some(c => c.id === loc.id || sameCoords(c, loc));
+}
+
+/** Removes a default favorite from the user's visible list (never deletes
+ * the canonical definition — restoreDefaultFavorite / restoreAllDefaults
+ * can always bring it back). Refuses silently for the permanent one. */
+export function removeDefaultFavorite(id) {
+    const fav = FAVORITE_LOCATIONS.find(f => f.id === id);
+    if (!fav || fav.permanent) return;
+    const state = loadFavoritesState();
+    if (!state.removedDefaultIds.includes(id)) {
+        state.removedDefaultIds.push(id);
+        saveFavoritesState(state);
+    }
+}
+
+export function restoreDefaultFavorite(id) {
+    const state = loadFavoritesState();
+    state.removedDefaultIds = state.removedDefaultIds.filter(x => x !== id);
+    saveFavoritesState(state);
+}
+
+/** Brings back every removed default. Does not touch the user's own
+ * custom saved locations. */
+export function restoreAllDefaults() {
+    const state = loadFavoritesState();
+    state.removedDefaultIds = [];
+    saveFavoritesState(state);
+}
+
+/** Saves a verified, fully-resolved location (the result the user actually
+ * selected — never a raw typed query) as a custom favorite. No-ops if it
+ * duplicates an existing default or custom favorite by id or coordinates. */
+export function addCustomFavorite(loc, emoji = '📍') {
+    if (!loc || typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return;
+    const defaultMatch = findMatchingDefault(loc);
+    if (defaultMatch) {
+        if (!defaultMatch.permanent) restoreDefaultFavorite(defaultMatch.id);
+        return;
+    }
+    const state = loadFavoritesState();
+    if (state.customFavorites.some(c => c.id === loc.id || sameCoords(c, loc))) return;
+    // Re-adding an already-custom-shaped object (e.g. an Undo right after
+    // removal) keeps its existing "custom-..." id and emoji instead of
+    // double-wrapping it into "custom-custom-...".
+    const id = typeof loc.id === 'string' && loc.id.startsWith('custom-')
+        ? loc.id
+        : loc.id != null ? `custom-${loc.id}` : `custom-${loc.latitude.toFixed(3)}-${loc.longitude.toFixed(3)}`;
+    const resolvedEmoji = loc.emoji || emoji;
+    state.customFavorites.push({
+        id, emoji: resolvedEmoji,
+        name: loc.name, admin1: loc.admin1 || '', admin2: loc.admin2 || '',
+        country: loc.country || '', countryCode: loc.countryCode || '',
+        postcode: loc.postcode || '', latitude: loc.latitude, longitude: loc.longitude,
+        timezone: loc.timezone || null, elevation: loc.elevation ?? null,
+        population: loc.population ?? null, featureCode: loc.featureCode || ''
+    });
+    saveFavoritesState(state);
+}
+
+export function removeCustomFavorite(id) {
+    const state = loadFavoritesState();
+    state.customFavorites = state.customFavorites.filter(c => c.id !== id);
+    saveFavoritesState(state);
+}
+
+/** Adds or removes `loc` from favorites, whichever applies — a default
+ * gets un/re-removed, anything else is added/removed as a custom entry.
+ * This is what the ♡/♥ heart button and the Favorites-list X both call. */
+export function toggleFavorite(loc, emoji = '📍') {
+    if (!loc) return;
+    const match = findMatchingDefault(loc);
+    if (match) {
+        if (match.permanent) return;
+        if (isRemovedDefault(match.id)) restoreDefaultFavorite(match.id);
+        else removeDefaultFavorite(match.id);
+        return;
+    }
+    const state = loadFavoritesState();
+    const existing = state.customFavorites.find(c => c.id === loc.id || sameCoords(c, loc));
+    if (existing) removeCustomFavorite(existing.id);
+    else addCustomFavorite(loc, emoji);
+}
+
 export function saveLastLocation(loc) {
     try {
         localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(loc));
