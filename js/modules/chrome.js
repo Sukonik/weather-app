@@ -1,9 +1,9 @@
 // Shared app "chrome": logo, theme switcher, unit toggles, location bar
-// (search + disambiguation + quick picks + geolocation), and the top-right
-// nav menu. Every page mounts this into a single <div id="app-chrome"></div>
-// so the header/nav never drifts between pages (no build step, so this is
-// the DRY mechanism instead of an HTML partial/include).
-import { searchLocations, reverseGeocode, formatLocationLabel, formatLocationDetail, saveLastLocation, getLastLocation, QUICK_LOCATIONS } from './location.js';
+// (search + disambiguation + Favorite Locations + geolocation), and the
+// top-right nav menu. Every page mounts this into a single
+// <div id="app-chrome"></div> so the header/nav never drifts between pages
+// (no build step, so this is the DRY mechanism instead of an HTML partial).
+import { searchLocations, reverseGeocode, formatLocationLabel, formatLocationDetail, saveLastLocation, getLastLocation, FAVORITE_LOCATIONS } from './location.js';
 import { makeAbortGroup } from './fetchUtils.js';
 
 const PAGES = [
@@ -92,6 +92,31 @@ function applyUnits() {
     document.dispatchEvent(new CustomEvent('clearsky:unitschange', { detail: getUnits() }));
 }
 
+/** Local time for a favorite's stored IANA timezone — no weather fetch,
+ * just Intl formatting, so opening this menu never makes a network call. */
+function formatFavoriteTime(fav) {
+    try {
+        return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: fav.timezone || undefined });
+    } catch {
+        return '--:--';
+    }
+}
+
+function favoriteRowHTML(fav, selectedId) {
+    const isSelected = fav.id === selectedId;
+    const place = [fav.admin1, fav.country].filter(Boolean).join(', ');
+    return `
+        <button class="favorite-item${isSelected ? ' selected' : ''}" data-fav-id="${fav.id}"${isSelected ? ' aria-current="true"' : ''}>
+            <span class="favorite-emoji" aria-hidden="true">${fav.emoji}</span>
+            <span class="favorite-info">
+                <span class="favorite-name">${fav.name}${place ? `, ${place}` : ''}</span>
+                <span class="favorite-time">${formatFavoriteTime(fav)}${fav.permanent ? ' • Home' : ''}</span>
+            </span>
+            ${isSelected ? '<i class="fas fa-check favorite-check" aria-hidden="true"></i>' : ''}
+        </button>
+    `;
+}
+
 function updateClock(root) {
     const now = new Date();
     const timeEl = root.querySelector('.current-time');
@@ -100,9 +125,11 @@ function updateClock(root) {
     if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function chromeTemplate(activePage) {
+function chromeTemplate(activePage, selectedId) {
     const themeOptions = ['dark', 'light', 'ocean', 'jungle', 'sunset', 'coffee'];
     const themeIcons = { dark: 'fa-moon', light: 'fa-sun', ocean: 'fa-water', jungle: 'fa-leaf', sunset: 'fa-cloud-sun', coffee: 'fa-mug-hot' };
+    const home = FAVORITE_LOCATIONS.find(f => f.permanent);
+    const rest = FAVORITE_LOCATIONS.filter(f => !f.permanent);
     return `
         <a class="app-logo" href="index.html" aria-label="ClearSky home">
             <div class="logo-icon"><div class="sun-circle"></div><div class="sun-rays"></div></div>
@@ -154,9 +181,21 @@ function chromeTemplate(activePage) {
                 </div>
                 <button id="search-btn" aria-label="Search"><i class="fas fa-search"></i></button>
                 <button id="current-location-btn" aria-label="Use current location"><i class="fas fa-location-dot"></i></button>
-            </div>
-            <div class="quick-locations" id="quick-locations">
-                ${QUICK_LOCATIONS.map(q => `<button class="quick-loc-btn" data-query="${q.query}">${q.label}</button>`).join('')}
+                <div class="favorites-selector">
+                    <button id="favorites-btn" class="theme-btn favorites-btn" aria-label="Favorite Locations" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-heart"></i><span>Favorites</span>
+                    </button>
+                    <div class="favorites-dropdown" id="favorites-dropdown" aria-label="Favorite Locations">
+                        <div class="favorites-section">
+                            <h4 class="favorites-section-title">🏠 Home</h4>
+                            ${favoriteRowHTML(home, selectedId)}
+                        </div>
+                        <div class="favorites-section">
+                            <h4 class="favorites-section-title">❤️ Favorites</h4>
+                            ${rest.map(f => favoriteRowHTML(f, selectedId)).join('')}
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="location-summary" id="location-summary"></div>
         </header>
@@ -189,7 +228,28 @@ async function selectLocation(root, loc) {
     renderLocationSummary(root, loc);
     const input = root.querySelector('#location-search');
     if (input) input.value = formatLocationLabel(loc);
+    updateFavoritesSelection(root, loc);
     emitLocationChange();
+}
+
+/** Keeps the Favorites dropdown's checkmark/aria-current in sync with
+ * whatever location is actually active, however it was selected (search,
+ * disambiguation picker, geolocation, or a favorite itself). */
+function updateFavoritesSelection(root, loc) {
+    const dropdown = root.querySelector('#favorites-dropdown');
+    if (!dropdown) return;
+    dropdown.querySelectorAll('.favorite-item').forEach(item => {
+        const isSelected = loc && item.dataset.favId === loc.id;
+        item.classList.toggle('selected', isSelected);
+        if (isSelected) item.setAttribute('aria-current', 'true');
+        else item.removeAttribute('aria-current');
+        const check = item.querySelector('.favorite-check');
+        if (isSelected && !check) {
+            item.insertAdjacentHTML('beforeend', '<i class="fas fa-check favorite-check" aria-hidden="true"></i>');
+        } else if (!isSelected && check) {
+            check.remove();
+        }
+    });
 }
 
 function showPicker(root, candidates) {
@@ -277,70 +337,86 @@ function wireSearchSuggestions(root) {
 export function initChrome({ page = 'overview' } = {}) {
     const mount = document.getElementById('app-chrome');
     if (!mount) throw new Error('initChrome: #app-chrome mount point not found');
-    mount.innerHTML = chromeTemplate(page);
+    mount.innerHTML = chromeTemplate(page, state.location?.id);
 
     applyTheme(state.theme);
     applyUnits();
     updateClock(mount);
     setInterval(() => updateClock(mount), 1000);
 
-    // Theme and Menu dropdowns are mutually exclusive: opening one always
-    // closes the other, Escape closes whichever is open and returns focus
-    // to its trigger button, and a click outside either closes both.
+    // Theme, Menu, and Favorites dropdowns are mutually exclusive: opening
+    // one always closes the other two, Escape closes whichever is open and
+    // returns focus to its trigger button, and a click outside all three
+    // closes all three.
     const themeBtn = mount.querySelector('#theme-btn');
     const themeDropdown = mount.querySelector('.theme-dropdown');
     const navBtn = mount.querySelector('#nav-btn');
     const navDropdown = mount.querySelector('#nav-dropdown');
+    const favoritesBtn = mount.querySelector('#favorites-btn');
+    const favoritesDropdown = mount.querySelector('#favorites-dropdown');
 
-    function closeThemeDropdown() {
-        themeDropdown.classList.remove('active');
-        themeBtn.setAttribute('aria-expanded', 'false');
+    const dropdowns = [
+        { btn: themeBtn, panel: themeDropdown },
+        { btn: navBtn, panel: navDropdown },
+        { btn: favoritesBtn, panel: favoritesDropdown }
+    ];
+
+    function closeDropdown(d) {
+        d.panel.classList.remove('active');
+        d.btn.setAttribute('aria-expanded', 'false');
     }
-    function closeNavDropdown() {
-        navDropdown.classList.remove('active');
-        navBtn.setAttribute('aria-expanded', 'false');
+    function openDropdown(d) {
+        dropdowns.filter(other => other !== d).forEach(closeDropdown);
+        d.panel.classList.add('active');
+        d.btn.setAttribute('aria-expanded', 'true');
     }
-    function openThemeDropdown() {
-        closeNavDropdown();
-        themeDropdown.classList.add('active');
-        themeBtn.setAttribute('aria-expanded', 'true');
-    }
-    function openNavDropdown() {
-        closeThemeDropdown();
-        navDropdown.classList.add('active');
-        navBtn.setAttribute('aria-expanded', 'true');
+    function toggleDropdown(d) {
+        if (d.panel.classList.contains('active')) closeDropdown(d);
+        else openDropdown(d);
     }
 
-    themeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (themeDropdown.classList.contains('active')) closeThemeDropdown();
-        else openThemeDropdown();
+    dropdowns.forEach(d => {
+        d.btn.addEventListener('click', (e) => { e.stopPropagation(); toggleDropdown(d); });
     });
     mount.querySelectorAll('.theme-option').forEach(opt => {
-        opt.addEventListener('click', () => { applyTheme(opt.dataset.theme); closeThemeDropdown(); });
-    });
-
-    navBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (navDropdown.classList.contains('active')) closeNavDropdown();
-        else openNavDropdown();
+        opt.addEventListener('click', () => { applyTheme(opt.dataset.theme); closeDropdown(dropdowns[0]); });
     });
 
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.theme-selector')) closeThemeDropdown();
-        if (!e.target.closest('.nav-selector')) closeNavDropdown();
+        if (!e.target.closest('.theme-selector')) closeDropdown(dropdowns[0]);
+        if (!e.target.closest('.nav-selector')) closeDropdown(dropdowns[1]);
+        if (!e.target.closest('.favorites-selector')) closeDropdown(dropdowns[2]);
     });
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        if (themeDropdown.classList.contains('active')) {
-            closeThemeDropdown();
-            themeBtn.focus();
-        } else if (navDropdown.classList.contains('active')) {
-            closeNavDropdown();
-            navBtn.focus();
+        const open = dropdowns.find(d => d.panel.classList.contains('active'));
+        if (open) {
+            closeDropdown(open);
+            open.btn.focus();
         }
     });
+
+    // Favorite Locations: clicking a favorite loads its canonical,
+    // hand-verified location object directly — never re-run as a text
+    // search, so a saved shortcut can never resolve to the wrong country.
+    favoritesDropdown.querySelectorAll('.favorite-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const fav = FAVORITE_LOCATIONS.find(f => f.id === item.dataset.favId);
+            if (fav) selectLocation(mount, fav);
+            closeDropdown(dropdowns[2]);
+            favoritesBtn.focus();
+        });
+    });
+    // Refresh each favorite's local-time label periodically while mounted —
+    // cheap Intl formatting only, never a network request.
+    setInterval(() => {
+        favoritesDropdown.querySelectorAll('.favorite-item').forEach(item => {
+            const fav = FAVORITE_LOCATIONS.find(f => f.id === item.dataset.favId);
+            const timeEl = item.querySelector('.favorite-time');
+            if (fav && timeEl) timeEl.textContent = `${formatFavoriteTime(fav)}${fav.permanent ? ' • Home' : ''}`;
+        });
+    }, 30000);
 
     // Unit toggles
     mount.querySelectorAll('.unit-btn').forEach(btn => btn.addEventListener('click', () => {
@@ -371,11 +447,6 @@ export function initChrome({ page = 'overview' } = {}) {
             const q = e.target.value.trim();
             if (q) runSearch(mount, q);
         }
-    });
-
-    // Quick locations
-    mount.querySelectorAll('.quick-loc-btn').forEach(btn => {
-        btn.addEventListener('click', () => runSearch(mount, btn.dataset.query));
     });
 
     // Current location
@@ -411,8 +482,8 @@ export function initChrome({ page = 'overview' } = {}) {
         mount.querySelector('#location-search').value = formatLocationLabel(state.location);
         emitLocationChange();
     } else if (navigator.geolocation) {
-        // Silent background attempt — if the user searches or taps a quick
-        // location before this resolves, its result must not clobber their
+        // Silent background attempt — if the user searches or picks a
+        // favorite before this resolves, its result must not clobber their
         // manual choice. Capture the generation counter and check it's
         // still current before applying.
         const startGeneration = locationGeneration;
