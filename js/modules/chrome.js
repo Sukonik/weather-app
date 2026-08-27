@@ -3,7 +3,10 @@
 // top-right nav menu. Every page mounts this into a single
 // <div id="app-chrome"></div> so the header/nav never drifts between pages
 // (no build step, so this is the DRY mechanism instead of an HTML partial).
-import { searchLocations, reverseGeocode, formatLocationLabel, formatLocationDetail, saveLastLocation, getLastLocation, FAVORITE_LOCATIONS } from './location.js';
+import {
+    searchLocations, reverseGeocode, formatLocationLabel, formatLocationDetail, saveLastLocation, getLastLocation,
+    getVisibleFavorites, isFavorite, toggleFavorite, restoreAllDefaults, isPermanentFavorite
+} from './location.js';
 import { makeAbortGroup } from './fetchUtils.js';
 
 const PAGES = [
@@ -102,20 +105,69 @@ function formatFavoriteTime(fav) {
     }
 }
 
+function favoritePlaceLabel(fav) {
+    return `${fav.name}${[fav.admin1, fav.country].filter(Boolean).join(', ') ? `, ${[fav.admin1, fav.country].filter(Boolean).join(', ')}` : ''}`;
+}
+
 function favoriteRowHTML(fav, selectedId) {
     const isSelected = fav.id === selectedId;
-    const place = [fav.admin1, fav.country].filter(Boolean).join(', ');
+    const label = favoritePlaceLabel(fav);
     return `
-        <button class="favorite-item${isSelected ? ' selected' : ''}" data-fav-id="${fav.id}"${isSelected ? ' aria-current="true"' : ''}>
-            <span class="favorite-emoji" aria-hidden="true">${fav.emoji}</span>
-            <span class="favorite-info">
-                <span class="favorite-name">${fav.name}${place ? `, ${place}` : ''}</span>
-                <span class="favorite-time">${formatFavoriteTime(fav)}${fav.permanent ? ' • Home' : ''}</span>
-            </span>
-            ${isSelected ? '<i class="fas fa-check favorite-check" aria-hidden="true"></i>' : ''}
-        </button>
+        <div class="favorite-row">
+            <button class="favorite-item${isSelected ? ' selected' : ''}" data-fav-id="${fav.id}"${isSelected ? ' aria-current="true"' : ''}>
+                <span class="favorite-emoji" aria-hidden="true">${fav.emoji}</span>
+                <span class="favorite-info">
+                    <span class="favorite-name">${label}</span>
+                    <span class="favorite-time">${formatFavoriteTime(fav)}${fav.permanent ? ' • Home' : ''}</span>
+                </span>
+                ${isSelected ? '<i class="fas fa-check favorite-check" aria-hidden="true"></i>' : ''}
+            </button>
+            ${fav.permanent ? '' : `<button class="favorite-remove-btn" data-remove-id="${fav.id}" aria-label="Remove ${label} from favorites"><i class="fas fa-times" aria-hidden="true"></i></button>`}
+        </div>
     `;
 }
+
+/** Builds and wires the Home / Favorites sections inside the dropdown from
+ * whatever's currently visible (defaults minus removed, plus custom saves)
+ * — called on mount and again after any add/remove/restore so the list,
+ * the dropdown, and the ♡/♥ heart button all stay in sync without a full
+ * page re-render. */
+function renderFavoritesList(root, selectedId) {
+    const container = root.querySelector('#favorites-list');
+    if (!container) return;
+    const visible = getVisibleFavorites();
+    const home = visible.find(f => f.permanent);
+    const rest = visible.filter(f => !f.permanent);
+    container.innerHTML = `
+        <div class="favorites-section">
+            <h4 class="favorites-section-title">🏠 Home</h4>
+            ${home ? favoriteRowHTML(home, selectedId) : ''}
+        </div>
+        <div class="favorites-section">
+            <h4 class="favorites-section-title">❤️ Favorites</h4>
+            ${rest.length ? rest.map(f => favoriteRowHTML(f, selectedId)).join('') : '<p class="favorites-empty">No favorites yet — search a location and tap ♡ to save it.</p>'}
+        </div>
+    `;
+    container.querySelectorAll('.favorite-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const fav = visible.find(f => f.id === item.dataset.favId);
+            if (fav) selectLocationCallback(fav);
+        });
+    });
+    container.querySelectorAll('.favorite-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const fav = visible.find(f => f.id === btn.dataset.removeId);
+            if (fav) removeFavoriteCallback(fav);
+        });
+    });
+}
+
+// Set by initChrome once `mount`/`selectLocation` exist, so the render
+// helpers above (called from multiple places) don't need them threaded
+// through every function signature.
+let selectLocationCallback = () => {};
+let removeFavoriteCallback = () => {};
 
 function updateClock(root) {
     const now = new Date();
@@ -125,11 +177,9 @@ function updateClock(root) {
     if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function chromeTemplate(activePage, selectedId) {
+function chromeTemplate(activePage) {
     const themeOptions = ['dark', 'light', 'ocean', 'jungle', 'sunset', 'coffee'];
     const themeIcons = { dark: 'fa-moon', light: 'fa-sun', ocean: 'fa-water', jungle: 'fa-leaf', sunset: 'fa-cloud-sun', coffee: 'fa-mug-hot' };
-    const home = FAVORITE_LOCATIONS.find(f => f.permanent);
-    const rest = FAVORITE_LOCATIONS.filter(f => !f.permanent);
     return `
         <a class="app-logo" href="index.html" aria-label="ClearSky home">
             <div class="logo-icon"><div class="sun-circle"></div><div class="sun-rays"></div></div>
@@ -186,18 +236,20 @@ function chromeTemplate(activePage, selectedId) {
                         <i class="fas fa-heart"></i><span>Favorites</span>
                     </button>
                     <div class="favorites-dropdown" id="favorites-dropdown" aria-label="Favorite Locations">
-                        <div class="favorites-section">
-                            <h4 class="favorites-section-title">🏠 Home</h4>
-                            ${favoriteRowHTML(home, selectedId)}
-                        </div>
-                        <div class="favorites-section">
-                            <h4 class="favorites-section-title">❤️ Favorites</h4>
-                            ${rest.map(f => favoriteRowHTML(f, selectedId)).join('')}
+                        <div id="favorites-toast" class="favorites-toast" role="status" aria-live="polite"></div>
+                        <div id="favorites-list"></div>
+                        <div class="favorites-footer">
+                            <button id="restore-defaults-btn" class="favorites-restore-btn">Restore default locations</button>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="location-summary" id="location-summary"></div>
+            <div class="location-summary-row">
+                <div class="location-summary" id="location-summary"></div>
+                <button id="favorite-heart-btn" class="favorite-heart-btn" aria-label="Add to favorites" hidden>
+                    <i class="fa-regular fa-heart" aria-hidden="true"></i>
+                </button>
+            </div>
         </header>
         <div class="modal" id="location-picker-modal">
             <div class="modal-content">
@@ -228,28 +280,33 @@ async function selectLocation(root, loc) {
     renderLocationSummary(root, loc);
     const input = root.querySelector('#location-search');
     if (input) input.value = formatLocationLabel(loc);
-    updateFavoritesSelection(root, loc);
+    // Keeps the Favorites dropdown's checkmark/aria-current and the ♡/♥
+    // heart button in sync with whatever location is actually active,
+    // however it was selected (search, disambiguation picker, geolocation,
+    // or a favorite itself).
+    renderFavoritesList(root, loc?.id);
+    updateHeartButton(root, loc);
     emitLocationChange();
 }
 
-/** Keeps the Favorites dropdown's checkmark/aria-current in sync with
- * whatever location is actually active, however it was selected (search,
- * disambiguation picker, geolocation, or a favorite itself). */
-function updateFavoritesSelection(root, loc) {
-    const dropdown = root.querySelector('#favorites-dropdown');
-    if (!dropdown) return;
-    dropdown.querySelectorAll('.favorite-item').forEach(item => {
-        const isSelected = loc && item.dataset.favId === loc.id;
-        item.classList.toggle('selected', isSelected);
-        if (isSelected) item.setAttribute('aria-current', 'true');
-        else item.removeAttribute('aria-current');
-        const check = item.querySelector('.favorite-check');
-        if (isSelected && !check) {
-            item.insertAdjacentHTML('beforeend', '<i class="fas fa-check favorite-check" aria-hidden="true"></i>');
-        } else if (!isSelected && check) {
-            check.remove();
-        }
-    });
+/** Shows/hides and sets the icon+label on the "add to favorites" heart
+ * next to the location summary. Never fetches anything — purely reflects
+ * whatever is already in `loc` against the current favorites list. */
+function updateHeartButton(root, loc) {
+    const heartBtn = root.querySelector('#favorite-heart-btn');
+    if (!heartBtn) return;
+    if (!loc) { heartBtn.hidden = true; return; }
+    heartBtn.hidden = false;
+    // The permanent Home favorite (Long Beach) can never be removed, so
+    // the heart has nothing useful to toggle there — hide it rather than
+    // offer an action that silently does nothing.
+    if (isPermanentFavorite(loc)) { heartBtn.hidden = true; return; }
+    const favorited = isFavorite(loc);
+    heartBtn.classList.toggle('favorited', favorited);
+    heartBtn.setAttribute('aria-pressed', String(favorited));
+    heartBtn.setAttribute('aria-label', `${favorited ? 'Remove' : 'Add'} ${formatLocationLabel(loc)} ${favorited ? 'from' : 'to'} favorites`);
+    const icon = heartBtn.querySelector('i');
+    if (icon) icon.className = favorited ? 'fas fa-heart' : 'fa-regular fa-heart';
 }
 
 function showPicker(root, candidates) {
@@ -337,7 +394,7 @@ function wireSearchSuggestions(root) {
 export function initChrome({ page = 'overview' } = {}) {
     const mount = document.getElementById('app-chrome');
     if (!mount) throw new Error('initChrome: #app-chrome mount point not found');
-    mount.innerHTML = chromeTemplate(page, state.location?.id);
+    mount.innerHTML = chromeTemplate(page);
 
     applyTheme(state.theme);
     applyUnits();
@@ -397,22 +454,81 @@ export function initChrome({ page = 'overview' } = {}) {
         }
     });
 
+    // Small inline "toast" for undo confirmations after a removal — lives
+    // inside the dropdown (which stays open across a removal) and
+    // auto-dismisses; role="status" announces it to screen readers too.
+    let toastTimer = null;
+    function showFavoritesToast(message, undoFn) {
+        const toast = mount.querySelector('#favorites-toast');
+        if (!toast) return;
+        clearTimeout(toastTimer);
+        const hide = () => { toast.classList.remove('active'); toast.innerHTML = ''; };
+        toast.innerHTML = `<span>${message}</span>` + (undoFn ? '<button type="button" class="favorites-toast-undo">Undo</button>' : '');
+        toast.classList.add('active');
+        if (undoFn) {
+            toast.querySelector('.favorites-toast-undo').addEventListener('click', () => { undoFn(); hide(); });
+        }
+        toastTimer = setTimeout(hide, 6000);
+    }
+
     // Favorite Locations: clicking a favorite loads its canonical,
     // hand-verified location object directly — never re-run as a text
     // search, so a saved shortcut can never resolve to the wrong country.
-    favoritesDropdown.querySelectorAll('.favorite-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const fav = FAVORITE_LOCATIONS.find(f => f.id === item.dataset.favId);
-            if (fav) selectLocation(mount, fav);
-            closeDropdown(dropdowns[2]);
-            favoritesBtn.focus();
+    selectLocationCallback = (fav) => {
+        selectLocation(mount, fav);
+        closeDropdown(dropdowns[2]);
+        favoritesBtn.focus();
+    };
+    // Removing only hides it from *this user's* list (the canonical
+    // default definition is untouched) — Undo puts it right back, and the
+    // dropdown deliberately stays open so the change is visible in place.
+    removeFavoriteCallback = (fav) => {
+        toggleFavorite(fav);
+        renderFavoritesList(mount, state.location?.id);
+        updateHeartButton(mount, state.location);
+        showFavoritesToast(`Removed ${favoritePlaceLabel(fav)} from favorites`, () => {
+            toggleFavorite(fav);
+            renderFavoritesList(mount, state.location?.id);
+            updateHeartButton(mount, state.location);
+        });
+    };
+    renderFavoritesList(mount, state.location?.id);
+    updateHeartButton(mount, state.location);
+
+    // "Restore default locations" brings back anything removed, without
+    // touching the user's own custom saved locations.
+    mount.querySelector('#restore-defaults-btn').addEventListener('click', () => {
+        restoreAllDefaults();
+        renderFavoritesList(mount, state.location?.id);
+        updateHeartButton(mount, state.location);
+        showFavoritesToast('Default locations restored');
+    });
+
+    // ♡ / ♥ heart button next to the location summary — adds or removes
+    // whatever location is currently selected (a live search result, not
+    // just a favorite), with the same Undo affordance as the list's X.
+    mount.querySelector('#favorite-heart-btn').addEventListener('click', () => {
+        if (!state.location || isPermanentFavorite(state.location)) return;
+        const loc = state.location;
+        const wasFavorite = isFavorite(loc);
+        toggleFavorite(loc);
+        renderFavoritesList(mount, state.location?.id);
+        updateHeartButton(mount, state.location);
+        showFavoritesToast(`${wasFavorite ? 'Removed' : 'Added'} ${formatLocationLabel(loc)} ${wasFavorite ? 'from' : 'to'} favorites`, () => {
+            toggleFavorite(loc);
+            renderFavoritesList(mount, state.location?.id);
+            updateHeartButton(mount, state.location);
         });
     });
+
     // Refresh each favorite's local-time label periodically while mounted —
-    // cheap Intl formatting only, never a network request.
+    // cheap Intl formatting only, never a network request. Patches text in
+    // place (not a full re-render) so it can't steal focus from a
+    // keyboard user mid-interaction with the open dropdown.
     setInterval(() => {
+        const visible = getVisibleFavorites();
         favoritesDropdown.querySelectorAll('.favorite-item').forEach(item => {
-            const fav = FAVORITE_LOCATIONS.find(f => f.id === item.dataset.favId);
+            const fav = visible.find(f => f.id === item.dataset.favId);
             const timeEl = item.querySelector('.favorite-time');
             if (fav && timeEl) timeEl.textContent = `${formatFavoriteTime(fav)}${fav.permanent ? ' • Home' : ''}`;
         });
