@@ -687,6 +687,27 @@ header {
     color: var(--text-primary);
 }
 
+.favorite-add-btn {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.favorite-add-btn:hover {
+    background-color: var(--hover-bg);
+    color: var(--accent);
+}
+
 .favorites-empty {
     margin: 0;
     padding: 0.5rem 0.75rem;
@@ -787,18 +808,64 @@ header {
 @media (prefers-reduced-motion: reduce) {
     .favorite-item,
     .favorite-remove-btn,
+    .favorite-add-btn,
     .favorites-restore-btn,
-    .favorite-heart-btn {
+    .favorite-heart-btn,
+    .emoji-choice-btn {
         transition: none;
     }
 }
 
 .location-summary-row {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: var(--space-2);
+}
+
+.emoji-picker-popover {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 0.5rem;
+    z-index: 1000;
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.emoji-picker-popover[hidden] {
+    display: none;
+}
+
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 44px);
+    gap: 0.25rem;
+}
+
+.emoji-choice-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background-color 0.2s;
+}
+
+.emoji-choice-btn:hover {
+    background-color: var(--hover-bg);
 }
 
 .location-summary {
