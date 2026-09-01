@@ -5,9 +5,20 @@
 // (no build step, so this is the DRY mechanism instead of an HTML partial).
 import {
     searchLocations, reverseGeocode, formatLocationLabel, formatLocationDetail, saveLastLocation, getLastLocation,
-    getVisibleFavorites, isFavorite, toggleFavorite, restoreAllDefaults, isPermanentFavorite
+    getVisibleFavorites, isFavorite, toggleFavorite, restoreAllDefaults, isHomeFavorite,
+    getHomeFavorite, setHome, restoreLongBeachAsHome, setEmojiForLocation,
+    addRecentLocation, getRecentLocations, clearRecentLocations
 } from './location.js';
 import { makeAbortGroup } from './fetchUtils.js';
+
+/** Simple emoji picker choices for customizing a favorite's icon. Emoji is
+ * always shown alongside the location name, never as its only identifier. */
+const EMOJI_CHOICES = [
+    { emoji: '🏠', label: 'Home' }, { emoji: '🏖️', label: 'Beach' }, { emoji: '🏙️', label: 'City' },
+    { emoji: '🌴', label: 'Tropical' }, { emoji: '🌊', label: 'Waterfront' }, { emoji: '🏔️', label: 'Mountain' },
+    { emoji: '🌲', label: 'Nature' }, { emoji: '🎓', label: 'School' }, { emoji: '💼', label: 'Work' },
+    { emoji: '✈️', label: 'Travel' }, { emoji: '⭐', label: 'Special' }, { emoji: '📍', label: 'General' }
+];
 
 const PAGES = [
     { id: 'overview', label: 'Overview', href: 'index.html', icon: 'fa-house' },
@@ -118,26 +129,42 @@ function favoriteRowHTML(fav, selectedId) {
                 <span class="favorite-emoji" aria-hidden="true">${fav.emoji}</span>
                 <span class="favorite-info">
                     <span class="favorite-name">${label}</span>
-                    <span class="favorite-time">${formatFavoriteTime(fav)}${fav.permanent ? ' • Home' : ''}</span>
+                    <span class="favorite-time">${formatFavoriteTime(fav)}${fav.isHome ? ' • Home' : ''}</span>
                 </span>
                 ${isSelected ? '<i class="fas fa-check favorite-check" aria-hidden="true"></i>' : ''}
             </button>
-            ${fav.permanent ? '' : `<button class="favorite-remove-btn" data-remove-id="${fav.id}" aria-label="Remove ${label} from favorites"><i class="fas fa-times" aria-hidden="true"></i></button>`}
+            ${fav.isHome ? '' : `<button class="favorite-remove-btn" data-remove-id="${fav.id}" aria-label="Remove ${label} from favorites"><i class="fas fa-times" aria-hidden="true"></i></button>`}
         </div>
     `;
 }
 
-/** Builds and wires the Home / Favorites sections inside the dropdown from
- * whatever's currently visible (defaults minus removed, plus custom saves)
- * — called on mount and again after any add/remove/restore so the list,
- * the dropdown, and the ♡/♥ heart button all stay in sync without a full
- * page re-render. */
+function recentRowHTML(loc) {
+    const label = favoritePlaceLabel(loc);
+    return `
+        <div class="favorite-row">
+            <button class="favorite-item" data-recent-id="${loc.id}">
+                <span class="favorite-emoji" aria-hidden="true">${loc.emoji || '📍'}</span>
+                <span class="favorite-info">
+                    <span class="favorite-name">${label}</span>
+                    <span class="favorite-time">${formatFavoriteTime(loc)}</span>
+                </span>
+            </button>
+            <button class="favorite-add-btn" data-recent-add-id="${loc.id}" aria-label="Add ${label} to favorites"><i class="fa-regular fa-heart" aria-hidden="true"></i></button>
+        </div>
+    `;
+}
+
+/** Builds and wires the Home / Favorites / Recent sections inside the
+ * dropdown from whatever's currently visible — called on mount and again
+ * after any add/remove/restore/reorder so the list, the dropdown, and the
+ * ♡/♥ heart button all stay in sync without a full page re-render. */
 function renderFavoritesList(root, selectedId) {
     const container = root.querySelector('#favorites-list');
     if (!container) return;
     const visible = getVisibleFavorites();
-    const home = visible.find(f => f.permanent);
-    const rest = visible.filter(f => !f.permanent);
+    const home = visible.find(f => f.isHome);
+    const rest = visible.filter(f => !f.isHome);
+    const recent = getRecentLocations();
     container.innerHTML = `
         <div class="favorites-section">
             <h4 class="favorites-section-title">🏠 Home</h4>
@@ -147,8 +174,14 @@ function renderFavoritesList(root, selectedId) {
             <h4 class="favorites-section-title">❤️ Favorites</h4>
             ${rest.length ? rest.map(f => favoriteRowHTML(f, selectedId)).join('') : '<p class="favorites-empty">No favorites yet — search a location and tap ♡ to save it.</p>'}
         </div>
+        ${recent.length ? `
+        <div class="favorites-section">
+            <h4 class="favorites-section-title">🕘 Recent Locations</h4>
+            ${recent.map(recentRowHTML).join('')}
+            <button id="clear-recent-btn" class="favorites-restore-btn">Clear Recent Locations</button>
+        </div>` : ''}
     `;
-    container.querySelectorAll('.favorite-item').forEach(item => {
+    container.querySelectorAll('.favorite-item[data-fav-id]').forEach(item => {
         item.addEventListener('click', () => {
             const fav = visible.find(f => f.id === item.dataset.favId);
             if (fav) selectLocationCallback(fav);
@@ -161,6 +194,21 @@ function renderFavoritesList(root, selectedId) {
             if (fav) removeFavoriteCallback(fav);
         });
     });
+    container.querySelectorAll('.favorite-item[data-recent-id]').forEach(item => {
+        item.addEventListener('click', () => {
+            const loc = recent.find(r => r.id === item.dataset.recentId);
+            if (loc) selectLocationCallback(loc);
+        });
+    });
+    container.querySelectorAll('.favorite-add-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const loc = recent.find(r => r.id === btn.dataset.recentAddId);
+            if (loc) addFavoriteFromRecentCallback(loc);
+        });
+    });
+    const clearRecentBtn = container.querySelector('#clear-recent-btn');
+    if (clearRecentBtn) clearRecentBtn.addEventListener('click', () => clearRecentCallback());
 }
 
 // Set by initChrome once `mount`/`selectLocation` exist, so the render
@@ -168,6 +216,8 @@ function renderFavoritesList(root, selectedId) {
 // through every function signature.
 let selectLocationCallback = () => {};
 let removeFavoriteCallback = () => {};
+let addFavoriteFromRecentCallback = () => {};
+let clearRecentCallback = () => {};
 
 function updateClock(root) {
     const now = new Date();
@@ -239,7 +289,9 @@ function chromeTemplate(activePage) {
                         <div id="favorites-toast" class="favorites-toast" role="status" aria-live="polite"></div>
                         <div id="favorites-list"></div>
                         <div class="favorites-footer">
-                            <button id="restore-defaults-btn" class="favorites-restore-btn">Restore default locations</button>
+                            <button id="go-home-btn" class="favorites-restore-btn">🏠 Go Home</button>
+                            <button id="restore-long-beach-home-btn" class="favorites-restore-btn">↩️ Restore Long Beach as Default Home</button>
+                            <button id="restore-defaults-btn" class="favorites-restore-btn">🔄 Restore default locations</button>
                         </div>
                     </div>
                 </div>
@@ -249,6 +301,17 @@ function chromeTemplate(activePage) {
                 <button id="favorite-heart-btn" class="favorite-heart-btn" aria-label="Add to favorites" hidden>
                     <i class="fa-regular fa-heart" aria-hidden="true"></i>
                 </button>
+                <button id="set-home-btn" class="favorite-heart-btn" aria-label="Set as Home" hidden>
+                    <i class="fas fa-house" aria-hidden="true"></i>
+                </button>
+                <button id="emoji-edit-btn" class="favorite-heart-btn" aria-label="Change icon" hidden>
+                    <i class="fas fa-palette" aria-hidden="true"></i>
+                </button>
+                <div class="emoji-picker-popover" id="emoji-picker-popover" hidden>
+                    <div class="emoji-picker-grid">
+                        ${EMOJI_CHOICES.map(e => `<button type="button" class="emoji-choice-btn" data-emoji="${e.emoji}" aria-label="${e.label}">${e.emoji}</button>`).join('')}
+                    </div>
+                </div>
             </div>
         </header>
         <div class="modal" id="location-picker-modal">
@@ -277,15 +340,21 @@ async function selectLocation(root, loc) {
     locationGeneration++;
     state.location = loc;
     saveLastLocation(loc);
+    // A non-favorited selection joins Recent Locations (no-ops for
+    // anything already favorited — it already has its own place in the
+    // menu). Must happen before renderFavoritesList so Recent reflects it.
+    addRecentLocation(loc);
     renderLocationSummary(root, loc);
     const input = root.querySelector('#location-search');
     if (input) input.value = formatLocationLabel(loc);
-    // Keeps the Favorites dropdown's checkmark/aria-current and the ♡/♥
-    // heart button in sync with whatever location is actually active,
-    // however it was selected (search, disambiguation picker, geolocation,
-    // or a favorite itself).
+    // Keeps the Favorites dropdown's checkmark/aria-current and the
+    // heart/home/emoji buttons in sync with whatever location is actually
+    // active, however it was selected (search, disambiguation picker,
+    // geolocation, a favorite, or a recent entry).
     renderFavoritesList(root, loc?.id);
     updateHeartButton(root, loc);
+    updateHomeButton(root, loc);
+    updateEmojiButton(root, loc);
     emitLocationChange();
 }
 
@@ -297,16 +366,38 @@ function updateHeartButton(root, loc) {
     if (!heartBtn) return;
     if (!loc) { heartBtn.hidden = true; return; }
     heartBtn.hidden = false;
-    // The permanent Home favorite (Long Beach) can never be removed, so
-    // the heart has nothing useful to toggle there — hide it rather than
-    // offer an action that silently does nothing.
-    if (isPermanentFavorite(loc)) { heartBtn.hidden = true; return; }
+    // The current Home can't be un-favorited directly (use Set Home
+    // elsewhere to replace it, which frees it up automatically) — the
+    // heart has nothing useful to toggle there.
+    if (isHomeFavorite(loc)) { heartBtn.hidden = true; return; }
     const favorited = isFavorite(loc);
     heartBtn.classList.toggle('favorited', favorited);
     heartBtn.setAttribute('aria-pressed', String(favorited));
     heartBtn.setAttribute('aria-label', `${favorited ? 'Remove' : 'Add'} ${formatLocationLabel(loc)} ${favorited ? 'from' : 'to'} favorites`);
     const icon = heartBtn.querySelector('i');
     if (icon) icon.className = favorited ? 'fas fa-heart' : 'fa-regular fa-heart';
+}
+
+/** Shows the 🏠 "Set as Home" action for the currently selected location —
+ * available on every verified favorite and search result, hidden once
+ * that location already *is* Home (nothing to set). */
+function updateHomeButton(root, loc) {
+    const homeBtn = root.querySelector('#set-home-btn');
+    if (!homeBtn) return;
+    if (!loc || isHomeFavorite(loc)) { homeBtn.hidden = true; return; }
+    homeBtn.hidden = false;
+    homeBtn.setAttribute('aria-label', `Set ${formatLocationLabel(loc)} as Home`);
+}
+
+/** Shows the 🎨 icon-customize action, but only once the selected location
+ * is actually a favorite — customizing the icon of something not saved
+ * anywhere wouldn't have anywhere to persist to. */
+function updateEmojiButton(root, loc) {
+    const emojiBtn = root.querySelector('#emoji-edit-btn');
+    if (!emojiBtn) return;
+    if (!loc || !isFavorite(loc)) { emojiBtn.hidden = true; root.querySelector('#emoji-picker-popover')?.setAttribute('hidden', ''); return; }
+    emojiBtn.hidden = false;
+    emojiBtn.setAttribute('aria-label', `Change icon for ${formatLocationLabel(loc)}`);
 }
 
 function showPicker(root, candidates) {
@@ -471,9 +562,20 @@ export function initChrome({ page = 'overview' } = {}) {
         toastTimer = setTimeout(hide, 6000);
     }
 
-    // Favorite Locations: clicking a favorite loads its canonical,
-    // hand-verified location object directly — never re-run as a text
-    // search, so a saved shortcut can never resolve to the wrong country.
+    // Keeps the dropdown list, the heart, the Set-Home button, and the
+    // emoji-edit button all in sync after any favorites-state change —
+    // used by every action below instead of repeating the same 4 calls.
+    function refreshFavoritesUI() {
+        renderFavoritesList(mount, state.location?.id);
+        updateHeartButton(mount, state.location);
+        updateHomeButton(mount, state.location);
+        updateEmojiButton(mount, state.location);
+    }
+
+    // Favorite Locations: clicking a favorite (or a Recent entry) loads
+    // its canonical, hand-verified location object directly — never
+    // re-run as a text search, so a saved shortcut can never resolve to
+    // the wrong country.
     selectLocationCallback = (fav) => {
         selectLocation(mount, fav);
         closeDropdown(dropdowns[2]);
@@ -484,41 +586,102 @@ export function initChrome({ page = 'overview' } = {}) {
     // dropdown deliberately stays open so the change is visible in place.
     removeFavoriteCallback = (fav) => {
         toggleFavorite(fav);
-        renderFavoritesList(mount, state.location?.id);
-        updateHeartButton(mount, state.location);
+        refreshFavoritesUI();
         showFavoritesToast(`Removed ${favoritePlaceLabel(fav)} from favorites`, () => {
             toggleFavorite(fav);
-            renderFavoritesList(mount, state.location?.id);
-            updateHeartButton(mount, state.location);
+            refreshFavoritesUI();
         });
     };
-    renderFavoritesList(mount, state.location?.id);
-    updateHeartButton(mount, state.location);
+    addFavoriteFromRecentCallback = (loc) => {
+        toggleFavorite(loc);
+        refreshFavoritesUI();
+        showFavoritesToast(`Added ${favoritePlaceLabel(loc)} to favorites`, () => {
+            toggleFavorite(loc);
+            refreshFavoritesUI();
+        });
+    };
+    clearRecentCallback = () => {
+        clearRecentLocations();
+        refreshFavoritesUI();
+    };
+    refreshFavoritesUI();
 
     // "Restore default locations" brings back anything removed, without
-    // touching the user's own custom saved locations.
+    // touching the user's own custom saved locations or current Home.
     mount.querySelector('#restore-defaults-btn').addEventListener('click', () => {
         restoreAllDefaults();
-        renderFavoritesList(mount, state.location?.id);
-        updateHeartButton(mount, state.location);
+        refreshFavoritesUI();
         showFavoritesToast('Default locations restored');
+    });
+
+    // "Go Home" loads the saved Home immediately — the one place weather
+    // data is actually allowed to change as a side effect of a favorites
+    // action, since the user explicitly asked to go there.
+    mount.querySelector('#go-home-btn').addEventListener('click', () => {
+        selectLocation(mount, getHomeFavorite());
+        closeDropdown(dropdowns[2]);
+        favoritesBtn.focus();
+    });
+
+    // "Restore Long Beach as Default Home" resets just the Home choice —
+    // it doesn't touch removed defaults or custom saves.
+    mount.querySelector('#restore-long-beach-home-btn').addEventListener('click', () => {
+        restoreLongBeachAsHome();
+        refreshFavoritesUI();
+        showFavoritesToast('Long Beach restored as default Home');
     });
 
     // ♡ / ♥ heart button next to the location summary — adds or removes
     // whatever location is currently selected (a live search result, not
     // just a favorite), with the same Undo affordance as the list's X.
     mount.querySelector('#favorite-heart-btn').addEventListener('click', () => {
-        if (!state.location || isPermanentFavorite(state.location)) return;
+        if (!state.location || isHomeFavorite(state.location)) return;
         const loc = state.location;
         const wasFavorite = isFavorite(loc);
         toggleFavorite(loc);
-        renderFavoritesList(mount, state.location?.id);
-        updateHeartButton(mount, state.location);
+        refreshFavoritesUI();
         showFavoritesToast(`${wasFavorite ? 'Removed' : 'Added'} ${formatLocationLabel(loc)} ${wasFavorite ? 'from' : 'to'} favorites`, () => {
             toggleFavorite(loc);
-            renderFavoritesList(mount, state.location?.id);
-            updateHeartButton(mount, state.location);
+            refreshFavoritesUI();
         });
+    });
+
+    // 🏠 "Set as Home" — a storage-only change. Weather data must NOT
+    // switch to the new Home unless the user also explicitly selects it
+    // (e.g. via "Go Home" or clicking it in the list), so this never calls
+    // selectLocation.
+    mount.querySelector('#set-home-btn').addEventListener('click', () => {
+        if (!state.location || isHomeFavorite(state.location)) return;
+        const loc = state.location;
+        const previousHome = getHomeFavorite();
+        setHome(loc);
+        refreshFavoritesUI();
+        showFavoritesToast(`${formatLocationLabel(loc)} is now Home`, () => {
+            setHome(previousHome);
+            refreshFavoritesUI();
+        });
+    });
+
+    // 🎨 Emoji picker — a small popover anchored under the location
+    // summary row, listing simple category icons. Persists via
+    // setEmojiForLocation, which resolves the selected location to
+    // whichever favorite record it actually corresponds to.
+    const emojiBtn = mount.querySelector('#emoji-edit-btn');
+    const emojiPopover = mount.querySelector('#emoji-picker-popover');
+    emojiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPopover.hidden = !emojiPopover.hidden;
+    });
+    emojiPopover.querySelectorAll('.emoji-choice-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (!state.location) return;
+            setEmojiForLocation(state.location, btn.dataset.emoji);
+            emojiPopover.hidden = true;
+            refreshFavoritesUI();
+        });
+    });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.location-summary-row')) emojiPopover.hidden = true;
     });
 
     // Refresh each favorite's local-time label periodically while mounted —
@@ -527,10 +690,10 @@ export function initChrome({ page = 'overview' } = {}) {
     // keyboard user mid-interaction with the open dropdown.
     setInterval(() => {
         const visible = getVisibleFavorites();
-        favoritesDropdown.querySelectorAll('.favorite-item').forEach(item => {
+        favoritesDropdown.querySelectorAll('.favorite-item[data-fav-id]').forEach(item => {
             const fav = visible.find(f => f.id === item.dataset.favId);
             const timeEl = item.querySelector('.favorite-time');
-            if (fav && timeEl) timeEl.textContent = `${formatFavoriteTime(fav)}${fav.permanent ? ' • Home' : ''}`;
+            if (fav && timeEl) timeEl.textContent = `${formatFavoriteTime(fav)}${fav.isHome ? ' • Home' : ''}`;
         });
     }, 30000);
 
