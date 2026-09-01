@@ -29,6 +29,7 @@ fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 
 const PAGES = [
     { id: 'overview', file: 'index.html', label: 'Overview' },
+    { id: 'shore', file: 'shore.html', label: 'Shore & Water' },
     { id: 'tides', file: 'tides.html', label: 'Tide Charts' },
     { id: 'air-quality', file: 'air-quality.html', label: 'Air Quality' },
     { id: 'wind', file: 'wind.html', label: 'Wind Data' },
@@ -320,6 +321,55 @@ async function main() {
             return 0;
         } catch (error) {
             log(`❌ Tide slider screenshots failed: ${error.message}`);
+            return 1;
+        }
+    });
+
+    // 5. Shore page: a city search resolving to named Shore Pins (not the
+    // whole city), then hero/chart/sections render without NaN/undefined,
+    // plus the honest "no supported Shore" state for an inland search.
+    log('\n## Shore page checks');
+    await sleep(6000); // space out geocoding calls — see note at top of main()
+    failures += await withBrowser(async (browser) => {
+        try {
+            const page = await browser.newPage();
+            await page.goto(new URL('shore.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.fill('#shore-search', 'Long Beach, NY');
+            await page.click('#shore-search-btn');
+            await page.waitForSelector('.shore-pick-item', { timeout: 15000 });
+            const pickCount = await page.locator('.shore-pick-item').count();
+            log(`${pickCount >= 2 ? '✅' : '❌'} City search "Long Beach, NY" returned ${pickCount} named Shore Pin(s) (not one city-wide result)`);
+            await page.click('.shore-pick-item[data-pick-index="0"]');
+            await page.waitForFunction(() => document.getElementById('shore-hero')?.hidden === false, null, { timeout: 20000 });
+            await page.waitForTimeout(1500);
+            const bodyText = await page.locator('body').innerText();
+            const hasNaN = /\bNaN\b/.test(bodyText);
+            const hasUndefined = /\bundefined\b/.test(bodyText);
+            const heroText = await page.locator('#shore-hero-name').innerText().catch(() => '');
+            const ok = !hasNaN && !hasUndefined && heroText.trim().length > 0;
+            log(`${ok ? '✅' : '❌'} Shore hero for a named beach: NaN=${hasNaN} undefined=${hasUndefined} hero="${heroText}"`);
+            await page.screenshot({ path: `${SCREENSHOT_DIR}/shore-lindell.png`, fullPage: true }).catch(() => {});
+            await page.close();
+            return ok && pickCount >= 2 ? 0 : 1;
+        } catch (error) {
+            log(`❌ Shore page (named beach) check failed: ${error.message}`);
+            return 1;
+        }
+    });
+
+    await sleep(6000);
+    failures += await withBrowser(async (browser) => {
+        try {
+            const page = await browser.newPage();
+            await page.goto(new URL('shore.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.fill('#shore-search', 'Topeka, Kansas');
+            await page.click('#shore-search-btn');
+            await page.waitForSelector('#shore-inland-message', { state: 'visible', timeout: 15000 });
+            log('✅ Inland search ("Topeka, Kansas") shows the honest "no supported Shore" message');
+            await page.close();
+            return 0;
+        } catch (error) {
+            log(`❌ Inland Shore search check failed: ${error.message}`);
             return 1;
         }
     });
