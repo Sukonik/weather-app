@@ -26,7 +26,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function getStationsByType(type) {
+export async function getStationsByType(type) {
     const cacheKey = `noaa_stations_${type}`;
     const cached = cacheGet(cacheKey, STATION_LIST_CACHE_MS);
     if (cached) return cached;
@@ -36,7 +36,7 @@ async function getStationsByType(type) {
     return stations;
 }
 
-async function stationSupportsProduct(stationId, productName) {
+export async function stationSupportsProduct(stationId, productName) {
     try {
         const data = await fetchJSON(`${NOAA_METADATA_BASE}/${stationId}.json?expand=products`, { timeoutMs: 6000, retries: 0 });
         const products = data?.stations?.[0]?.products?.products || [];
@@ -46,7 +46,7 @@ async function stationSupportsProduct(stationId, productName) {
     }
 }
 
-function nearestCandidates(stations, latitude, longitude, count) {
+export function nearestCandidates(stations, latitude, longitude, count) {
     return stations
         .map(s => ({ id: s.id, name: s.name, latitude: parseFloat(s.lat), longitude: parseFloat(s.lng), distanceKm: haversineKm(latitude, longitude, parseFloat(s.lat), parseFloat(s.lng)) }))
         .sort((a, b) => a.distanceKm - b.distanceKm)
@@ -85,7 +85,7 @@ async function findNearestStation(latitude, longitude, maxKm = 120) {
     return { id: nearest.id, name: nearest.name, latitude: parseFloat(nearest.lat), longitude: parseFloat(nearest.lng), distanceKm: nearestDist };
 }
 
-async function fetchNOAAProduct(stationId, product, extraParams = '') {
+export async function fetchNOAAProduct(stationId, product, extraParams = '') {
     const url = `${NOAA_DATA_URL}?station=${stationId}&product=${product}&datum=MLLW&time_zone=lst_ldt&units=english&format=json${extraParams}`;
     return fetchJSON(url, { timeoutMs: 8000, retries: 1 });
 }
