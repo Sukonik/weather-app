@@ -22,6 +22,7 @@ const EMOJI_CHOICES = [
 
 const PAGES = [
     { id: 'overview', label: 'Overview', href: 'index.html', icon: 'fa-house' },
+    { id: 'shore', label: 'Shore & Water', href: 'shore.html', icon: 'fa-umbrella-beach' },
     { id: 'tides', label: 'Tide Charts', href: 'tides.html', icon: 'fa-water' },
     { id: 'air-quality', label: 'Air Quality', href: 'air-quality.html', icon: 'fa-wind' },
     { id: 'wind', label: 'Wind Data', href: 'wind.html', icon: 'fa-flag' },
