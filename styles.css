@@ -1194,10 +1194,10 @@ header {
 .tsp-label { color: var(--text-secondary); }
 .tsp-value { color: var(--metric-value-color); font-weight: 700; }
 
-#tide-chart {
+#tide-chart, #hourly-timeline-chart, #shore-chart {
     cursor: pointer;
 }
-#tide-chart:focus-visible {
+#tide-chart:focus-visible, #hourly-timeline-chart:focus-visible, #shore-chart:focus-visible {
     outline: 2px solid var(--chart-cursor-color);
     outline-offset: 2px;
 }
@@ -2538,6 +2538,22 @@ canvas {
 
 .error-message:not(:empty) {
     display: block;
+}
+
+.retry-inline-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: inherit;
+    border-radius: var(--radius-sm);
+    padding: 2px 10px;
+    font-size: var(--font-xs);
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: var(--space-2);
+}
+
+.retry-inline-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
 }
 
 /* ============================================

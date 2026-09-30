@@ -16,10 +16,14 @@ function initApp() {
     modal?.querySelector('.close-btn')?.addEventListener('click', () => modal.classList.remove('active'));
     modal?.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
 
+    let lastLoc = null;
+
     async function loadAirQuality(loc) {
+        lastLoc = loc;
         try {
             loadingEl.style.display = 'flex';
             errorEl.textContent = '';
+            errorEl.innerHTML = '';
             const signal = abortGroup();
             const key = `aqi_page_${loc.latitude.toFixed(3)},${loc.longitude.toFixed(3)}`;
             let data = cacheGet(key, 10 * 60 * 1000);
@@ -33,7 +37,10 @@ function initApp() {
         } catch (error) {
             if (error?.message?.includes('superseded')) return;
             console.error('Air quality page error:', error);
-            errorEl.textContent = 'Unable to load air quality data. Please try again.';
+            // A genuine upstream failure gets an explicit retry action
+            // rather than a dead-end message (Issue #9).
+            errorEl.innerHTML = `<span>Unable to load air quality data. Please try again.</span> <button type="button" class="retry-inline-btn" id="aqi-page-retry-btn">Retry</button>`;
+            document.getElementById('aqi-page-retry-btn')?.addEventListener('click', () => { if (lastLoc) loadAirQuality(lastLoc); });
             loadingEl.style.display = 'none';
         }
     }
