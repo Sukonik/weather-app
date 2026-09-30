@@ -13,7 +13,8 @@ try {
         getCloudCoverDescription,
         getWindDirection,
         formatSpeed,
-        formatPressure
+        formatPressure,
+        parseOpenMeteoTime
     } = await import('./js/modules/utils.js');
     const { initializeAnimations, updatePrecipitationDisplay, updateWindDisplay } = await import('./js/modules/visualization.js');
     const { initChrome, onLocationChange, onUnitsChange, getUnits } = await import('./js/modules/chrome.js');
@@ -120,7 +121,13 @@ try {
         function buildHourlyPoints(data) {
             const { unit } = getUnits();
             const now = Date.now();
-            const times = data.hourly.time.map(t => new Date(t).getTime());
+            // Open-Meteo's timezone=auto hourly times are naive local-time
+            // strings for the *queried location*, not UTC — must be
+            // converted using the location's own utc_offset_seconds, or
+            // "now" ends up compared against the wrong hour entirely
+            // (harmless for the old simple forward-looking strip, but wrong
+            // for a precise past/future scrub window).
+            const times = data.hourly.time.map(t => parseOpenMeteoTime(t, data.utc_offset_seconds));
             let nowIdx = times.findIndex(t => t >= now);
             if (nowIdx < 0) nowIdx = Math.max(0, times.length - 1);
             const points = times.map((t, i) => ({
@@ -143,10 +150,10 @@ try {
             return { points, secondarySeries };
         }
 
-        function renderHourlySelectedPanel(info) {
+        function renderHourlySelectedPanel(info, timeZone) {
             const { speedUnit } = getUnits();
             const meta = info.point.meta;
-            const timeLabel = new Date(info.point.time).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true })
+            const timeLabel = new Date(info.point.time).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: timeZone || undefined })
                 + (info.isNow ? ' (Now)' : info.isPast ? ' (past)' : '');
             document.getElementById('hourly-tsp-time').textContent = timeLabel;
             document.getElementById('hourly-tsp-condition').textContent = meta.code != null ? getWeatherDescription(meta.code) : UNAVAILABLE;
@@ -193,8 +200,9 @@ try {
                 unitLabel: `°${unit}`,
                 formatValue: v => `${Math.round(v)}°${unit}`,
                 formatSecondary: v => `${Math.round(v)}% rain`,
+                timeZone: data.timezone,
                 ariaLabel: 'Hourly forecast timeline — drag, touch, or use arrow keys to inspect an hour',
-                onSelect: (index, info) => renderHourlySelectedPanel(info)
+                onSelect: (index, info) => renderHourlySelectedPanel(info, data.timezone)
             });
             applyHourlyRangeFilter();
         }
