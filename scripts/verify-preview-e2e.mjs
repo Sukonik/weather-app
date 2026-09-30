@@ -374,6 +374,72 @@ async function main() {
         }
     });
 
+    // 6. Issue #9: a completely fresh profile (no saved location) with
+    // geolocation denied (Chromium's default when no permission is granted)
+    // must still resolve to the configured Home and actually load data —
+    // never leave #location-summary and every card empty forever.
+    log('\n## Issue #9: fresh-profile Home fallback');
+    await sleep(6000);
+    failures += await withBrowser(async (browser) => {
+        try {
+            const page = await browser.newPage(); // fresh context: no localStorage, geolocation not granted
+            await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForFunction(() => document.querySelector('#location-summary')?.textContent?.trim().length > 0, null, { timeout: 15000 });
+            await waitForLoadingClear(page);
+            await page.waitForTimeout(500);
+            const summaryText = await page.locator('#location-summary').innerText();
+            const tempText = await page.locator('.temperature').innerText();
+            const bodyText = await page.locator('body').innerText();
+            const ok = summaryText.trim().length > 0 && tempText !== '--' && !/\bNaN\b/.test(bodyText) && !/\bundefined\b/.test(bodyText);
+            log(`${ok ? '✅' : '❌'} Fresh profile + denied geolocation resolved to: "${summaryText}", temperature="${tempText}"`);
+            await page.close();
+            return ok ? 0 : 1;
+        } catch (error) {
+            log(`❌ Issue #9 fresh-profile fallback check failed: ${error.message}`);
+            return 1;
+        }
+    });
+
+    // 7. Overview's new scrubbable hourly timeline (Issue #10, PR A):
+    // real data populates the selected-hour panel, and a keyboard arrow
+    // press actually moves the selection (aria-valuetext changes) — the
+    // core interaction every later Wind/AQI/UV/Rain PR will reuse.
+    log('\n## Hourly timeline (Overview) checks');
+    await sleep(6000);
+    failures += await withBrowser(async (browser) => {
+        try {
+            const page = await browser.newPage();
+            await page.goto(new URL('index.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForSelector('#location-search', { timeout: 10000 });
+            await page.fill('#location-search', '11561');
+            await page.keyboard.press('Enter');
+            await resolveSearch(page);
+            await waitForLoadingClear(page);
+            await page.waitForFunction(() => document.getElementById('hourly-timeline-slider')?.max > 0, null, { timeout: 15000 });
+
+            const timeText = await page.locator('#hourly-tsp-time').innerText();
+            const tempText = await page.locator('#hourly-tsp-temp').innerText();
+            const initialValueText = await page.locator('#hourly-timeline-slider').getAttribute('aria-valuetext');
+            const populated = timeText.trim().length > 0 && timeText !== '--' && tempText !== '--' && !!initialValueText;
+            log(`${populated ? '✅' : '❌'} Selected-hour panel populated on load: time="${timeText}" temp="${tempText}"`);
+
+            const slider = page.locator('#hourly-timeline-slider');
+            await slider.focus();
+            await slider.press('ArrowRight');
+            await page.waitForTimeout(200);
+            const nextValueText = await slider.getAttribute('aria-valuetext');
+            const moved = !!nextValueText && nextValueText !== initialValueText;
+            log(`${moved ? '✅' : '❌'} Keyboard ArrowRight moves the selection: "${initialValueText}" → "${nextValueText}"`);
+
+            await page.screenshot({ path: `${SCREENSHOT_DIR}/hourly-timeline.png`, fullPage: true }).catch(() => {});
+            await page.close();
+            return (populated && moved) ? 0 : 1;
+        } catch (error) {
+            log(`❌ Hourly timeline check failed: ${error.message}`);
+            return 1;
+        }
+    });
+
     log(`\n## Result: ${failures === 0 ? '✅ ALL CHECKS PASSED' : `❌ ${failures} CHECK(S) FAILED`}`);
 
     if (process.env.GITHUB_STEP_SUMMARY) {

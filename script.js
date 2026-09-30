@@ -13,18 +13,25 @@ try {
         getCloudCoverDescription,
         getWindDirection,
         formatSpeed,
-        formatPressure
+        formatPressure,
+        parseOpenMeteoTime
     } = await import('./js/modules/utils.js');
     const { initializeAnimations, updatePrecipitationDisplay, updateWindDisplay } = await import('./js/modules/visualization.js');
     const { initChrome, onLocationChange, onUnitsChange, getUnits } = await import('./js/modules/chrome.js');
     const { formatUpdatedTime } = await import('./js/modules/fetchUtils.js');
+    const { createHourlyTimeline } = await import('./js/modules/hourlyTimeline.js');
 
     let currentWeatherData = null;
+    let lastLocation = null;
     let currentHourIndex = 0;
     let precipMode = 'current';
     let windMode = 'current';
     let rainParticles = [];
     let windParticles = [];
+    let hourlyTimeline = null;
+    let fullHourlyPoints = [];
+    let fullHourlySecondary = [];
+    let hourlyRangeHours = 24;
 
     const UNAVAILABLE = 'Data unavailable';
     const na = (value, fmt) => (value === null || value === undefined || Number.isNaN(value)) ? UNAVAILABLE : fmt(value);
@@ -106,44 +113,104 @@ try {
             }
         }
 
-        function renderHourlyStrip(data) {
-            const strip = document.getElementById('hourly-strip');
-            if (!strip || !data.hourly?.time?.length) return;
+        // Scrubbable hourly timeline (Issue #10, PR A) — recent history plus
+        // forecast, centered near "now". Each point carries its own raw
+        // fields in `meta` so the selected-hour panel never has to re-index
+        // back into `data.hourly` (which would break once the chart is
+        // showing a filtered 24H/48H slice rather than the full array).
+        function buildHourlyPoints(data) {
             const { unit } = getUnits();
-
-            // Bug: comparing the ISO time string directly against the epoch
-            // number `now` coerces the string via ToNumber (always NaN), so
-            // `t >= now` was always false — findIndex always returned -1,
-            // silently falling back to the dataset's first hour (midnight)
-            // instead of the current local hour. Parse to a timestamp first.
             const now = Date.now();
-            let startIdx = data.hourly.time.findIndex(t => new Date(t).getTime() >= now);
-            if (startIdx < 0) startIdx = 0;
+            // Open-Meteo's timezone=auto hourly times are naive local-time
+            // strings for the *queried location*, not UTC — must be
+            // converted using the location's own utc_offset_seconds, or
+            // "now" ends up compared against the wrong hour entirely
+            // (harmless for the old simple forward-looking strip, but wrong
+            // for a precise past/future scrub window).
+            const times = data.hourly.time.map(t => parseOpenMeteoTime(t, data.utc_offset_seconds));
+            let nowIdx = times.findIndex(t => t >= now);
+            if (nowIdx < 0) nowIdx = Math.max(0, times.length - 1);
+            const points = times.map((t, i) => ({
+                time: t,
+                value: convertTemperature(data.hourly.temperature_2m[i], unit),
+                isPast: t < now,
+                isNow: i === nowIdx,
+                meta: {
+                    code: data.hourly.weather_code?.[i],
+                    precipProb: data.hourly.precipitation_probability?.[i] ?? null,
+                    precipAmount: data.hourly.precipitation?.[i] ?? null,
+                    windSpeedKmh: data.hourly.wind_speed_10m?.[i] ?? null,
+                    windDirDeg: data.hourly.wind_direction_10m?.[i] ?? null,
+                    gustsKmh: data.hourly.wind_gusts_10m?.[i] ?? null
+                }
+            }));
+            const secondarySeries = points
+                .map(p => ({ time: p.time, value: p.meta.precipProb }))
+                .filter(s => s.value != null);
+            return { points, secondarySeries };
+        }
 
-            const count = 16;
-            const cards = [];
-            for (let i = startIdx; i < Math.min(startIdx + count, data.hourly.time.length); i++) {
-                const time = new Date(data.hourly.time[i]);
-                const label = i === startIdx ? 'Now' : time.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
-                const temp = Math.round(convertTemperature(data.hourly.temperature_2m[i], unit));
-                const icon = getWeatherIcon(data.hourly.weather_code[i]);
-                const precip = data.hourly.precipitation_probability?.[i];
-                cards.push(`
-                    <div class="hour-card">
-                        <span class="hour-time">${label}</span>
-                        <i class="fas ${icon}"></i>
-                        <span class="hour-temp">${temp}°</span>
-                        <span class="hour-precip">${precip > 0 ? `<i class="fas fa-tint"></i>${precip}%` : ''}</span>
-                    </div>
-                `);
-            }
-            strip.innerHTML = cards.join('');
+        function renderHourlySelectedPanel(info, timeZone) {
+            const { speedUnit } = getUnits();
+            const meta = info.point.meta;
+            const timeLabel = new Date(info.point.time).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: timeZone || undefined })
+                + (info.isNow ? ' (Now)' : info.isPast ? ' (past)' : '');
+            document.getElementById('hourly-tsp-time').textContent = timeLabel;
+            document.getElementById('hourly-tsp-condition').textContent = meta.code != null ? getWeatherDescription(meta.code) : UNAVAILABLE;
+            document.getElementById('hourly-tsp-temp').textContent = info.formattedValue;
+            document.getElementById('hourly-tsp-precip').textContent = meta.precipProb != null
+                ? `${meta.precipProb}% chance${meta.precipAmount != null ? ` · ${meta.precipAmount.toFixed(1)} mm` : ''}`
+                : UNAVAILABLE;
+            document.getElementById('hourly-tsp-wind').textContent = meta.windSpeedKmh != null
+                ? `${formatSpeed(meta.windSpeedKmh, speedUnit)} ${meta.windDirDeg != null ? getWindDirection(meta.windDirDeg) : ''}`.trim()
+                : UNAVAILABLE;
+            document.getElementById('hourly-tsp-gusts').textContent = meta.gustsKmh != null ? formatSpeed(meta.gustsKmh, speedUnit) : UNAVAILABLE;
+        }
+
+        function applyHourlyRangeFilter() {
+            if (!hourlyTimeline || !fullHourlyPoints.length) return;
+            const nowIdx = Math.max(0, fullHourlyPoints.findIndex(p => p.isNow));
+            const startIdx = Math.max(0, nowIdx - 3); // ~3h of recent history, per product spec
+            const cutoff = fullHourlyPoints[nowIdx].time + hourlyRangeHours * 3600 * 1000;
+            const filtered = fullHourlyPoints.filter((p, i) => i >= startIdx && p.time <= cutoff);
+            const points = filtered.length ? filtered : fullHourlyPoints;
+            const start = points[0].time, end = points[points.length - 1].time;
+            const filteredSecondary = fullHourlySecondary.filter(s => s.time >= start && s.time <= end);
+            hourlyTimeline.setData(points, filteredSecondary);
+        }
+
+        function renderHourlyTimeline(data) {
+            const canvas = document.getElementById('hourly-timeline-chart');
+            const slider = document.getElementById('hourly-timeline-slider');
+            const announceEl = document.getElementById('hourly-timeline-announce');
+            if (!canvas || !slider || !data.hourly?.time?.length) return;
+            const { unit } = getUnits();
+            const { points, secondarySeries } = buildHourlyPoints(data);
+            fullHourlyPoints = points;
+            fullHourlySecondary = secondarySeries;
+
+            // Units (°C/°F) change what each point's `value` even *is*, not
+            // just its label, so the chart is rebuilt from scratch rather
+            // than patched in place — matches the Tide Charts page's pattern
+            // for its own unit-dependent rebuilds.
+            if (hourlyTimeline) hourlyTimeline.destroy();
+            hourlyTimeline = createHourlyTimeline({
+                canvas, slider, announceEl,
+                points, secondarySeries,
+                unitLabel: `°${unit}`,
+                formatValue: v => `${Math.round(v)}°${unit}`,
+                formatSecondary: v => `${Math.round(v)}% rain`,
+                timeZone: data.timezone,
+                ariaLabel: 'Hourly forecast timeline — drag, touch, or use arrow keys to inspect an hour',
+                onSelect: (index, info) => renderHourlySelectedPanel(info, data.timezone)
+            });
+            applyHourlyRangeFilter();
         }
 
         function updateWeatherDisplays(data) {
             const { unit, speedUnit } = getUnits();
             updateHeroTemperature(data);
-            renderHourlyStrip(data);
+            renderHourlyTimeline(data);
 
             const windDirection = getWindDirection(data.current.wind_direction_10m);
             const windSpeed = formatSpeed(data.current.wind_speed_10m, speedUnit);
@@ -242,7 +309,17 @@ try {
                             </div>
                         `).join('') || `<div class="pollutant-item">${UNAVAILABLE}</div>`;
                 } else {
-                    pollutantsContainer.innerHTML = `<div class="pollutant-item">${data.air_quality_error || UNAVAILABLE}</div>`;
+                    // A genuine upstream AQI failure (weather itself may still
+                    // have loaded fine — independent failure boundary) gets an
+                    // explicit retry action rather than a dead-end message.
+                    pollutantsContainer.innerHTML = `
+                        <div class="pollutant-item">
+                            <span>${data.air_quality_error || UNAVAILABLE}</span>
+                            <button type="button" class="retry-inline-btn" id="aqi-retry-btn">Retry</button>
+                        </div>`;
+                    document.getElementById('aqi-retry-btn')?.addEventListener('click', () => {
+                        if (lastLocation) updateWeather(lastLocation.latitude, lastLocation.longitude, lastLocation.name);
+                    });
                 }
             }
 
@@ -347,6 +424,15 @@ try {
         windCurrentBtn?.addEventListener('click', () => { windMode = 'current'; setHourlyButtonStates(); updateHourlyWind(); });
         windForecastBtn?.addEventListener('click', () => { windMode = 'forecast'; setHourlyButtonStates(); updateHourlyWind(); });
 
+        document.querySelectorAll('[data-hourly-range]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-hourly-range]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                hourlyRangeHours = Number(btn.dataset.hourlyRange);
+                applyHourlyRangeFilter();
+            });
+        });
+
         function updateVisualizations() {
             setupHourlyAnimations();
             updateHourlyPrecipitation();
@@ -357,12 +443,27 @@ try {
         if (precipCanvas) resizeObserver.observe(precipCanvas);
         if (windCanvas) resizeObserver.observe(windCanvas);
 
+        // Two location changes can legitimately fire in quick succession —
+        // e.g. the Issue #9 Home fallback selecting a location right before
+        // a user's own search resolves to that same place — and each
+        // starts its own async fetch. Without a guard, whichever fetch
+        // happens to resolve *last* wins and tears down/rebuilds the hourly
+        // timeline (and every other display) even if it's now stale,
+        // which can land mid-interaction (e.g. right after a keyboard
+        // selection) and silently undo it. A generation counter, the same
+        // pattern chrome.js already uses for its own location races,
+        // discards a response that's no longer the most recent request.
+        let weatherRequestGeneration = 0;
+
         async function updateWeather(latitude, longitude, locationName) {
+            lastLocation = { latitude, longitude, name: locationName };
+            const requestGeneration = ++weatherRequestGeneration;
             try {
                 if (loadingElement) loadingElement.style.display = 'flex';
-                if (errorElement) errorElement.textContent = '';
+                if (errorElement) { errorElement.textContent = ''; errorElement.innerHTML = ''; }
 
                 const data = await getWeatherData(latitude, longitude, locationName);
+                if (requestGeneration !== weatherRequestGeneration) return; // superseded by a newer request
                 if (!data || !data.current) {
                     throw new Error('Invalid weather data received');
                 }
@@ -377,9 +478,11 @@ try {
 
                 if (loadingElement) loadingElement.style.display = 'none';
             } catch (error) {
+                if (requestGeneration !== weatherRequestGeneration) return; // superseded by a newer request
                 console.error('Error updating weather:', error);
                 if (errorElement) {
-                    errorElement.textContent = error.message || 'Unable to fetch weather data. Please try again.';
+                    errorElement.innerHTML = `<span>${error.message || 'Unable to fetch weather data. Please try again.'}</span> <button type="button" class="retry-inline-btn" id="weather-retry-btn">Retry</button>`;
+                    document.getElementById('weather-retry-btn')?.addEventListener('click', () => updateWeather(latitude, longitude, locationName));
                 }
                 if (loadingElement) loadingElement.style.display = 'none';
             }
