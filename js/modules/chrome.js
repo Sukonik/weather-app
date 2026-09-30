@@ -756,24 +756,38 @@ export function initChrome({ page = 'overview' } = {}) {
     modal.querySelector('.close-btn').addEventListener('click', () => modal.classList.remove('active'));
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
 
-    // Restore last location, else attempt geolocation silently
+    // Restore last location, else attempt geolocation silently, falling
+    // back to the current Home favorite if geolocation is unsupported,
+    // denied, or times out — otherwise onLocationChange() never fires at
+    // all and every data page is left permanently blank (Issue #9). Home
+    // is resolved dynamically via getHomeFavorite(), so this always uses
+    // whichever location the user has actually set as Home, not a
+    // hardcoded Long Beach.
     if (state.location) {
         renderLocationSummary(mount, state.location);
         mount.querySelector('#location-search').value = formatLocationLabel(state.location);
         emitLocationChange();
-    } else if (navigator.geolocation) {
-        // Silent background attempt — if the user searches or picks a
-        // favorite before this resolves, its result must not clobber their
-        // manual choice. Capture the generation counter and check it's
-        // still current before applying.
+    } else {
+        // Capture the generation counter and check it's still current
+        // before applying — if the user searches or picks a favorite
+        // before geolocation (or this fallback) resolves, that manual
+        // choice must never be clobbered.
         const startGeneration = locationGeneration;
-        getCurrentPositionWithHardTimeout()
-            .then(async (position) => {
-                if (locationGeneration !== startGeneration) return; // superseded by a manual selection
-                const loc = await reverseGeocode(position.coords.latitude, position.coords.longitude);
-                if (locationGeneration !== startGeneration) return;
-                await selectLocation(mount, loc);
-            })
-            .catch(() => { /* silent — user can search manually */ });
+        const fallBackToHome = () => {
+            if (locationGeneration !== startGeneration) return; // superseded by a manual selection
+            selectLocation(mount, getHomeFavorite());
+        };
+        if (navigator.geolocation) {
+            getCurrentPositionWithHardTimeout()
+                .then(async (position) => {
+                    if (locationGeneration !== startGeneration) return; // superseded by a manual selection
+                    const loc = await reverseGeocode(position.coords.latitude, position.coords.longitude);
+                    if (locationGeneration !== startGeneration) return;
+                    await selectLocation(mount, loc);
+                })
+                .catch(fallBackToHome);
+        } else {
+            fallBackToHome();
+        }
     }
 }
