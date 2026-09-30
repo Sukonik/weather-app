@@ -1194,10 +1194,10 @@ header {
 .tsp-label { color: var(--text-secondary); }
 .tsp-value { color: var(--metric-value-color); font-weight: 700; }
 
-#tide-chart, #hourly-timeline-chart, #shore-chart {
+#tide-chart, #hourly-timeline-chart, #shore-chart, #wind-chart {
     cursor: pointer;
 }
-#tide-chart:focus-visible, #hourly-timeline-chart:focus-visible, #shore-chart:focus-visible {
+#tide-chart:focus-visible, #hourly-timeline-chart:focus-visible, #shore-chart:focus-visible, #wind-chart:focus-visible {
     outline: 2px solid var(--chart-cursor-color);
     outline-offset: 2px;
 }

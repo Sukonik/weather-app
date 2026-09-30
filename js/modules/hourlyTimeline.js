@@ -18,7 +18,18 @@ const prefersReducedMotion = () =>
  * @param {Array<{time:number, value:number, isPast?:boolean, isNow?:boolean}>} opts.points
  *   Sorted ascending by time. Real returned hours only — never interpolated.
  * @param {Array<{time:number, value:number}>} [opts.secondarySeries] - e.g. precip
- *   probability (0-100), drawn as light bars scaled to its own 0-100 axis.
+ *   probability (0-100, drawn as light bars scaled to its own 0-100 axis) or
+ *   wind gusts (same unit as the primary series — see secondaryShareAxis).
+ * @param {'bar'|'line'} [opts.secondaryStyle] - 'bar' (default) draws light
+ *   bars on an independent 0-100 axis (e.g. precip probability); 'line'
+ *   draws a second, lighter/dashed line sharing the primary axis (e.g. a
+ *   gust line alongside sustained wind speed) — requires secondaryShareAxis.
+ * @param {boolean} [opts.secondaryShareAxis] - when true, secondarySeries
+ *   values are included in the shared min/max Y range instead of their own
+ *   independent 0-100 scale. Use with secondaryStyle:'line'.
+ * @param {Array<{time:number, degrees:number}>} [opts.directionSeries] - optional
+ *   per-hour direction (e.g. wind direction in degrees, meteorological
+ *   "from" convention), drawn as small rotated arrow ticks along the top.
  * @param {string} [opts.unitLabel]
  * @param {(v:number)=>string} [opts.formatValue]
  * @param {(v:number)=>string} [opts.formatSecondary]
@@ -33,6 +44,9 @@ export function createHourlyTimeline(opts) {
     const { canvas, slider, announceEl } = opts;
     let points = opts.points || [];
     let secondarySeries = opts.secondarySeries || [];
+    let directionSeries = opts.directionSeries || [];
+    const secondaryStyle = opts.secondaryStyle || 'bar';
+    const secondaryShareAxis = !!opts.secondaryShareAxis;
     const unitLabel = opts.unitLabel || '';
     const formatValue = opts.formatValue || (v => `${Math.round(v)}${unitLabel}`);
     const formatSecondary = opts.formatSecondary || (v => `${Math.round(v)}%`);
@@ -104,10 +118,11 @@ export function createHourlyTimeline(opts) {
         }
 
         const values = points.map(p => p.value);
-        const min = Math.min(...values);
-        const max = Math.max(...values);
+        const sharedSecondaryValues = secondaryShareAxis ? secondarySeries.map(s => s.value) : [];
+        const min = Math.min(...values, ...sharedSecondaryValues);
+        const max = Math.max(...values, ...sharedSecondaryValues);
         const range = (max - min) || 1;
-        const padL = 42, padR = 12, padT = 16, padB = 28;
+        const padL = 42, padR = 12, padT = directionSeries.length ? 28 : 16, padB = 28;
         const chartW = w - padL - padR, chartH = h - padT - padB;
         const minTime = points[0].time, maxTime = points[points.length - 1].time;
         const timeSpan = (maxTime - minTime) || 1;
@@ -154,8 +169,10 @@ export function createHourlyTimeline(opts) {
             ctx.fillText(new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: opts.timeZone || undefined }), xFor(t), h - 8);
         }
 
-        // Secondary bar series (e.g. precipitation probability), own 0-100 axis.
-        if (secondarySeries.length) {
+        // Secondary series: either light bars on an independent 0-100 axis
+        // (e.g. precipitation probability) or a second line sharing the
+        // primary axis (e.g. a gust line alongside sustained wind speed).
+        if (secondarySeries.length && secondaryStyle === 'bar') {
             const barW = Math.max(2, chartW / points.length - 2);
             ctx.fillStyle = cursorColor;
             ctx.globalAlpha = 0.18;
@@ -164,6 +181,43 @@ export function createHourlyTimeline(opts) {
                 if (sv == null) return;
                 const barH = (sv / 100) * chartH * 0.4;
                 ctx.fillRect(xFor(p.time) - barW / 2, padT + chartH - barH, barW, barH);
+            });
+            ctx.globalAlpha = 1;
+        } else if (secondarySeries.length && secondaryStyle === 'line') {
+            const secLinePoints = points.map(p => {
+                const sv = secondaryAt(p.time);
+                return sv == null ? null : { x: xFor(p.time), y: yFor(sv) };
+            }).filter(Boolean);
+            if (secLinePoints.length > 1) {
+                ctx.strokeStyle = labelColor;
+                ctx.globalAlpha = 0.55;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 4]);
+                ctx.beginPath();
+                ctx.moveTo(secLinePoints[0].x, secLinePoints[0].y);
+                for (let i = 1; i < secLinePoints.length; i++) ctx.lineTo(secLinePoints[i].x, secLinePoints[i].y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // Per-hour direction markers (e.g. wind direction) — small rotated
+        // arrows along the top of the plot area.
+        if (directionSeries.length) {
+            ctx.fillStyle = labelColor;
+            ctx.globalAlpha = 0.55;
+            directionSeries.forEach(d => {
+                const x = xFor(d.time);
+                if (x < padL - 1 || x > w - padR + 1) return;
+                ctx.save();
+                ctx.translate(x, 10);
+                ctx.rotate((d.degrees * Math.PI) / 180);
+                ctx.beginPath();
+                ctx.moveTo(0, -5); ctx.lineTo(3, 4); ctx.lineTo(0, 2); ctx.lineTo(-3, 4);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
             });
             ctx.globalAlpha = 1;
         }
@@ -294,9 +348,10 @@ export function createHourlyTimeline(opts) {
     window.addEventListener('resize', onResize);
 
     return {
-        setData(newPoints, newSecondarySeries) {
+        setData(newPoints, newSecondarySeries, newDirectionSeries) {
             points = newPoints || [];
             secondarySeries = newSecondarySeries || [];
+            if (newDirectionSeries !== undefined) directionSeries = newDirectionSeries || [];
             slider.min = '0';
             slider.max = String(Math.max(0, points.length - 1));
             slider.step = '1';
