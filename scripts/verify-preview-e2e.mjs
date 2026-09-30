@@ -440,6 +440,53 @@ async function main() {
         }
     });
 
+    // 8. Wind page's timeline (Issue #10, PR B) — the second real consumer
+    // of the shared hourlyTimeline module (a shared-axis gust line +
+    // direction markers, not just a bar series), so this also proves the
+    // module actually generalizes rather than being Overview-specific.
+    log('\n## Wind timeline checks');
+    await sleep(6000);
+    failures += await withBrowser(async (browser) => {
+        try {
+            const page = await browser.newPage();
+            await page.goto(new URL('wind.html', PREVIEW_URL).toString(), { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForSelector('#location-search', { timeout: 10000 });
+            await page.fill('#location-search', '11561');
+            await page.keyboard.press('Enter');
+            await resolveSearch(page);
+            await waitForLoadingClear(page);
+            await page.waitForFunction(() => document.getElementById('wind-slider')?.max > 0, null, { timeout: 15000 });
+
+            const timeText = await page.locator('#wind-tsp-time').innerText();
+            const speedText = await page.locator('#wind-tsp-speed').innerText();
+            const strengthText = await page.locator('#wind-strength-badge').innerText();
+            const gustValueText = await page.locator('#strongest-gust-value').innerText();
+            const initialValueText = await page.locator('#wind-slider').getAttribute('aria-valuetext');
+            const populated = timeText.trim().length > 0 && speedText !== 'Data unavailable' && strengthText.trim().length > 0 && !!initialValueText;
+            log(`${populated ? '✅' : '❌'} Wind panel populated on load: time="${timeText}" speed="${speedText}" strength="${strengthText}" strongestGust="${gustValueText}"`);
+
+            const slider = page.locator('#wind-slider');
+            await slider.focus();
+            await slider.press('ArrowRight');
+            await page.waitForTimeout(200);
+            const nextValueText = await slider.getAttribute('aria-valuetext');
+            const moved = !!nextValueText && nextValueText !== initialValueText;
+            log(`${moved ? '✅' : '❌'} Keyboard ArrowRight moves the wind selection: "${initialValueText}" → "${nextValueText}"`);
+
+            const cyclistText = await page.locator('#cyclist-guidance-list').innerText();
+            const outdoorText = await page.locator('#outdoor-guidance-list').innerText();
+            const guidancePresent = cyclistText.trim().length > 0 && outdoorText.trim().length > 0;
+            log(`${guidancePresent ? '✅' : '❌'} Cyclist/outdoor guidance rendered`);
+
+            await page.screenshot({ path: `${SCREENSHOT_DIR}/wind-timeline.png`, fullPage: true }).catch(() => {});
+            await page.close();
+            return (populated && moved && guidancePresent) ? 0 : 1;
+        } catch (error) {
+            log(`❌ Wind timeline check failed: ${error.message}`);
+            return 1;
+        }
+    });
+
     log(`\n## Result: ${failures === 0 ? '✅ ALL CHECKS PASSED' : `❌ ${failures} CHECK(S) FAILED`}`);
 
     if (process.env.GITHUB_STEP_SUMMARY) {
