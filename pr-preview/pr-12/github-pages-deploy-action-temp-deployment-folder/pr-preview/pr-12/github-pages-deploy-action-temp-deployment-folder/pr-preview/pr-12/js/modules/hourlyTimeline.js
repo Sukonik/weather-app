@@ -22,10 +22,6 @@ const prefersReducedMotion = () =>
  * @param {string} [opts.unitLabel]
  * @param {(v:number)=>string} [opts.formatValue]
  * @param {(v:number)=>string} [opts.formatSecondary]
- * @param {string} [opts.timeZone] - IANA zone (e.g. "America/New_York") for
- *   the *queried location*, used for every displayed time label. `points`
- *   themselves must already be true UTC epoch values — see parseOpenMeteoTime
- *   in utils.js for converting Open-Meteo's naive `timezone=auto` strings.
  * @param {string} [opts.ariaLabel]
  * @param {(index:number, info:object)=>void} opts.onSelect - called on every selection change
  */
@@ -80,12 +76,8 @@ export function createHourlyTimeline(opts) {
         };
     }
 
-    // Always formats in the *queried location's* timezone (when supplied),
-    // never the viewer's own device timezone — otherwise a scrubbable
-    // "local time" timeline would silently show the wrong hours to anyone
-    // not physically in that timezone themselves.
     function fmtTime(t) {
-        return new Date(t).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: opts.timeZone || undefined });
+        return new Date(t).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
     }
 
     function draw() {
@@ -151,7 +143,7 @@ export function createHourlyTimeline(opts) {
         const xTicks = 4;
         for (let i = 0; i <= xTicks; i++) {
             const t = minTime + (timeSpan * i / xTicks);
-            ctx.fillText(new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: opts.timeZone || undefined }), xFor(t), h - 8);
+            ctx.fillText(new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }), xFor(t), h - 8);
         }
 
         // Secondary bar series (e.g. precipitation probability), own 0-100 axis.

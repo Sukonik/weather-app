@@ -1,52 +1,46 @@
-// Dependency-free scrubbable hourly timeline: a canvas chart (primary line
-// series + an optional secondary bar series) synchronized with a native
-// range slider, plus a "Now" marker separating recent history from the
-// forecast. Interaction model (drag/touch/keyboard/aria) is deliberately
-// the same shape as tideChart.js so this becomes the shared foundation for
-// Wind, AQI, UV, and Rain's own hourly charts — each page only supplies
-// its own series data, formatting, and selected-hour panel.
+// Dependency-free interactive tide chart: a canvas curve + a synchronized
+// native range slider, both snapped to the *actual* returned data points
+// (never interpolated/invented values). Supports mouse drag, touch, and
+// keyboard, and reports every selection change through onSelect() so the
+// page can render a "selected point" panel and announce it to screen
+// readers.
 import { getThemeColor, fitCanvasToDisplaySize } from './visualization.js';
 
-const prefersReducedMotion = () =>
-    typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Smooths a polyline through real points via quadratic curves between
+ * midpoints — purely a rendering treatment; the underlying values shown
+ * in labels/markers/the selected-point panel are always the exact ones. */
+function smoothPath(ctx, points) {
+    if (points.length < 2) return;
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i], p1 = points[i + 1];
+        const midX = (p0.x + p1.x) / 2, midY = (p0.y + p1.y) / 2;
+        ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x, last.y);
+}
 
 /**
  * @param {Object} opts
  * @param {HTMLCanvasElement} opts.canvas
- * @param {HTMLInputElement} opts.slider - native <input type="range">
+ * @param {HTMLInputElement} opts.slider - a native <input type="range">
  * @param {HTMLElement} [opts.announceEl] - aria-live region for SR announcements
- * @param {Array<{time:number, value:number, isPast?:boolean, isNow?:boolean}>} opts.points
- *   Sorted ascending by time. Real returned hours only — never interpolated.
- * @param {Array<{time:number, value:number}>} [opts.secondarySeries] - e.g. precip
- *   probability (0-100), drawn as light bars scaled to its own 0-100 axis.
- * @param {string} [opts.unitLabel]
+ * @param {Array<{time:number, value:number, sourceType:'observation'|'prediction'|'modeled'}>} opts.points
+ *   Sorted ascending by time. Required, must be non-empty for the chart to render.
+ * @param {Array<{time:number, value:number, type:'H'|'L'}>} [opts.hiloPoints] - high/low markers
+ * @param {string} opts.unitLabel - e.g. "ft" or "m"
  * @param {(v:number)=>string} [opts.formatValue]
- * @param {(v:number)=>string} [opts.formatSecondary]
- * @param {string} [opts.timeZone] - IANA zone (e.g. "America/New_York") for
- *   the *queried location*, used for every displayed time label. `points`
- *   themselves must already be true UTC epoch values — see parseOpenMeteoTime
- *   in utils.js for converting Open-Meteo's naive `timezone=auto` strings.
- * @param {string} [opts.ariaLabel]
- * @param {(index:number, info:object)=>void} opts.onSelect - called on every selection change
+ * @param {(index:number, point:object)=>void} opts.onSelect - called on every selection change
  */
-export function createHourlyTimeline(opts) {
+export function createTideChart(opts) {
     const { canvas, slider, announceEl } = opts;
     let points = opts.points || [];
-    let secondarySeries = opts.secondarySeries || [];
+    let hiloPoints = opts.hiloPoints || [];
     const unitLabel = opts.unitLabel || '';
-    const formatValue = opts.formatValue || (v => `${Math.round(v)}${unitLabel}`);
-    const formatSecondary = opts.formatSecondary || (v => `${Math.round(v)}%`);
+    const formatValue = opts.formatValue || (v => `${v.toFixed(2)} ${unitLabel}`);
     let selectedIndex = 0;
     let dragging = false;
-    const reduceMotion = prefersReducedMotion();
-
-    function nowIndex() {
-        const idx = points.findIndex(p => p.isNow);
-        if (idx >= 0) return idx;
-        const now = Date.now();
-        const fallback = points.findIndex(p => p.time >= now);
-        return fallback >= 0 ? fallback : 0;
-    }
 
     function nearestIndexToTime(t) {
         let best = 0, bestDiff = Infinity;
@@ -57,35 +51,39 @@ export function createHourlyTimeline(opts) {
         return best;
     }
 
-    function secondaryAt(time) {
-        const match = secondarySeries.find(s => s.time === time);
-        return match ? match.value : null;
-    }
-
     function describePoint(i) {
         const p = points[i];
         const prev = points[i - 1];
+        const next = points[i + 1];
         let trend = 'steady';
         if (prev && p.value > prev.value) trend = 'rising';
         else if (prev && p.value < prev.value) trend = 'falling';
-        const secondaryValue = secondaryAt(p.time);
-        return {
-            point: p, trend,
-            formattedValue: formatValue(p.value),
-            secondaryValue,
-            formattedSecondary: secondaryValue != null ? formatSecondary(secondaryValue) : null,
-            unitLabel,
-            isPast: !!p.isPast,
-            isNow: !!p.isNow
-        };
+        if (next) {
+            const willRise = next.value > p.value;
+            const willFall = next.value < p.value;
+            if (trend === 'rising' && willFall) trend = 'near high';
+            if (trend === 'falling' && willRise) trend = 'near low';
+        }
+        const diff = prev ? p.value - prev.value : null;
+
+        // Time until next high/low from the hilo marker list
+        const nextEvent = hiloPoints.find(h => h.time > p.time);
+        const timeUntilNext = nextEvent ? nextEvent.time - p.time : null;
+
+        const sourceLabel = { observation: 'Observation', prediction: 'Official prediction', modeled: 'Modeled estimate' }[p.sourceType] || 'Unknown';
+
+        return { point: p, trend, diff, nextEvent, timeUntilNext, sourceLabel, formattedValue: formatValue(p.value), unitLabel };
     }
 
-    // Always formats in the *queried location's* timezone (when supplied),
-    // never the viewer's own device timezone — otherwise a scrubbable
-    // "local time" timeline would silently show the wrong hours to anyone
-    // not physically in that timezone themselves.
     function fmtTime(t) {
-        return new Date(t).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: opts.timeZone || undefined });
+        return new Date(t).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+
+    function fmtDuration(ms) {
+        if (ms == null) return '—';
+        const totalMin = Math.round(Math.abs(ms) / 60000);
+        const h = Math.floor(totalMin / 60), m = totalMin % 60;
+        return `${h}h ${m}m`;
     }
 
     function draw() {
@@ -98,14 +96,14 @@ export function createHourlyTimeline(opts) {
             ctx.globalAlpha = 0.7;
             ctx.font = '500 13px Inter, Arial, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('No hourly data available', w / 2, h / 2);
+            ctx.fillText('No tide data available', w / 2, h / 2);
             ctx.globalAlpha = 1;
             return;
         }
 
         const values = points.map(p => p.value);
-        const min = Math.min(...values);
-        const max = Math.max(...values);
+        const min = Math.min(...values, ...hiloPoints.map(p => p.value));
+        const max = Math.max(...values, ...hiloPoints.map(p => p.value));
         const range = (max - min) || 1;
         const padL = 42, padR = 12, padT = 16, padB = 28;
         const chartW = w - padL - padR, chartH = h - padT - padB;
@@ -117,25 +115,16 @@ export function createHourlyTimeline(opts) {
 
         const labelColor = getThemeColor('--chart-label-color', 'rgba(255,255,255,0.6)');
         const cursorColor = getThemeColor('--chart-cursor-color', '#33b7e0');
-        const pastColor = getThemeColor('--text-secondary', '#999999');
 
-        // Past-hours shading (subtle) so history reads as distinct from forecast.
-        const nowIdx = nowIndex();
-        if (nowIdx > 0) {
-            ctx.fillStyle = pastColor;
-            ctx.globalAlpha = 0.06;
-            ctx.fillRect(padL, padT, xFor(points[nowIdx].time) - padL, chartH);
-            ctx.globalAlpha = 1;
-        }
-
-        // Y-axis gridlines
+        // Y-axis gridlines + labels
         ctx.strokeStyle = labelColor;
         ctx.fillStyle = labelColor;
         ctx.globalAlpha = 0.2;
         ctx.font = '11px Inter, Arial, sans-serif';
         const ySteps = 4;
         for (let i = 0; i <= ySteps; i++) {
-            const y = yFor(min + (range * i / ySteps));
+            const v = min + (range * i / ySteps);
+            const y = yFor(v);
             ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
         }
         ctx.globalAlpha = 1;
@@ -143,44 +132,29 @@ export function createHourlyTimeline(opts) {
             const v = min + (range * i / ySteps);
             const y = yFor(v);
             ctx.textAlign = 'right';
-            ctx.fillText(Math.round(v), padL - 6, y + 3);
+            ctx.fillText(v.toFixed(1), padL - 6, y + 3);
         }
 
-        // X-axis time labels
+        // X-axis time labels (a handful of evenly spaced ticks)
         ctx.textAlign = 'center';
         const xTicks = 4;
         for (let i = 0; i <= xTicks; i++) {
             const t = minTime + (timeSpan * i / xTicks);
-            ctx.fillText(new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: opts.timeZone || undefined }), xFor(t), h - 8);
+            const x = xFor(t);
+            ctx.fillText(new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }), x, h - 8);
         }
 
-        // Secondary bar series (e.g. precipitation probability), own 0-100 axis.
-        if (secondarySeries.length) {
-            const barW = Math.max(2, chartW / points.length - 2);
-            ctx.fillStyle = cursorColor;
-            ctx.globalAlpha = 0.18;
-            points.forEach(p => {
-                const sv = secondaryAt(p.time);
-                if (sv == null) return;
-                const barH = (sv / 100) * chartH * 0.4;
-                ctx.fillRect(xFor(p.time) - barW / 2, padT + chartH - barH, barW, barH);
-            });
-            ctx.globalAlpha = 1;
-        }
-
-        // Primary line + gradient fill
+        // Curve — connects only real returned points; if the curve is
+        // sparse (hilo-only station), this still just draws smoothed
+        // segments between real values, never fabricated ones.
         const linePoints = points.map(p => ({ x: xFor(p.time), y: yFor(p.value) }));
+
+        // Soft gradient fill under the curve for visual depth.
         const fillGradient = ctx.createLinearGradient(0, padT, 0, padT + chartH);
         fillGradient.addColorStop(0, cursorColor + '2e');
         fillGradient.addColorStop(1, cursorColor + '00');
         ctx.beginPath();
-        ctx.moveTo(linePoints[0].x, linePoints[0].y);
-        for (let i = 0; i < linePoints.length - 1; i++) {
-            const p0 = linePoints[i], p1 = linePoints[i + 1];
-            const midX = (p0.x + p1.x) / 2, midY = (p0.y + p1.y) / 2;
-            ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
-        }
-        ctx.lineTo(linePoints[linePoints.length - 1].x, linePoints[linePoints.length - 1].y);
+        smoothPath(ctx, linePoints);
         ctx.lineTo(linePoints[linePoints.length - 1].x, padT + chartH);
         ctx.lineTo(linePoints[0].x, padT + chartH);
         ctx.closePath();
@@ -192,37 +166,28 @@ export function createHourlyTimeline(opts) {
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(linePoints[0].x, linePoints[0].y);
-        for (let i = 0; i < linePoints.length - 1; i++) {
-            const p0 = linePoints[i], p1 = linePoints[i + 1];
-            const midX = (p0.x + p1.x) / 2, midY = (p0.y + p1.y) / 2;
-            ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
-        }
-        ctx.lineTo(linePoints[linePoints.length - 1].x, linePoints[linePoints.length - 1].y);
+        smoothPath(ctx, linePoints);
         ctx.stroke();
 
-        // "Now" marker — a static line (no animation) unless the user allows
-        // motion, in which case a soft pulse gives the MSN-style liveliness
-        // the product spec asks for without a heavy animation dependency.
-        if (points[nowIdx]) {
-            const x = xFor(points[nowIdx].time);
-            ctx.strokeStyle = cursorColor;
+        // High/low markers
+        hiloPoints.forEach(hp => {
+            if (hp.time < minTime || hp.time > maxTime) return;
+            const x = xFor(hp.time), y = yFor(hp.value);
+            ctx.fillStyle = hp.type === 'H' ? '#ff9f43' : '#4fa8ff';
+            ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '600 11px Inter, Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(hp.type === 'H' ? 'H' : 'L', x, y - 8);
+        });
+
+        // Current-time marker (vertical line)
+        const now = Date.now();
+        if (now >= minTime && now <= maxTime) {
+            const x = xFor(now);
+            ctx.strokeStyle = labelColor;
             ctx.setLineDash([4, 4]);
             ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
             ctx.setLineDash([]);
-            ctx.font = '600 10px Inter, Arial, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = cursorColor;
-            ctx.fillText('NOW', x, padT - 4);
-            if (!reduceMotion) {
-                const pulse = 3 + Math.sin(Date.now() / 500) * 1.5;
-                ctx.beginPath();
-                ctx.globalAlpha = 0.5;
-                ctx.arc(x, yFor(points[nowIdx].value), pulse + 4, 0, Math.PI * 2);
-                ctx.fillStyle = cursorColor;
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
         }
 
         // Selected-point cursor
@@ -234,12 +199,7 @@ export function createHourlyTimeline(opts) {
             ctx.strokeStyle = getThemeColor('--metric-value-color', '#fff');
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.stroke();
-        }
-
-        if (!reduceMotion && points[nowIdx]) {
-            // Keep the subtle pulse alive without ever moving the chart data.
-            cancelAnimationFrame(draw._raf);
-            draw._raf = requestAnimationFrame(() => { if (canvas.isConnected) draw(); });
+            ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.strokeStyle = cursorColor; ctx.globalAlpha = 0.4; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
         }
     }
 
@@ -248,7 +208,7 @@ export function createHourlyTimeline(opts) {
         selectedIndex = Math.max(0, Math.min(points.length - 1, index));
         const info = describePoint(selectedIndex);
         slider.value = String(selectedIndex);
-        const valueText = `${fmtTime(info.point.time)} — ${formatValue(info.point.value)}${info.formattedSecondary ? `, ${info.formattedSecondary}` : ''}${info.isNow ? ' (now)' : info.isPast ? ' (past)' : ''}`;
+        const valueText = `${fmtTime(info.point.time)} — ${formatValue(info.point.value)}, ${info.trend}`;
         slider.setAttribute('aria-valuetext', valueText);
         if (announceEl && announce) announceEl.textContent = valueText;
         draw();
@@ -256,6 +216,8 @@ export function createHourlyTimeline(opts) {
     }
 
     function xToIndex(clientX) {
+        // Work in CSS pixels (rect.width) — canvas.width is the DPI-scaled
+        // drawing-buffer size, not the on-screen size, since fitCanvasToDisplaySize.
         const rect = canvas.getBoundingClientRect();
         const padL = 42, padR = 12;
         const relX = clientX - rect.left;
@@ -266,7 +228,7 @@ export function createHourlyTimeline(opts) {
 
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'slider');
-    canvas.setAttribute('aria-label', opts.ariaLabel || 'Hourly timeline — drag or use arrow keys to inspect an hour');
+    canvas.setAttribute('aria-label', 'Tide chart — drag or use arrow keys to inspect a point in time');
 
     const onMouseDown = (e) => { dragging = true; select(xToIndex(e.clientX)); };
     const onMouseMove = (e) => { if (dragging) select(xToIndex(e.clientX)); };
@@ -294,21 +256,20 @@ export function createHourlyTimeline(opts) {
     window.addEventListener('resize', onResize);
 
     return {
-        setData(newPoints, newSecondarySeries) {
+        setData(newPoints, newHiloPoints, newUnitLabel, newFormatValue) {
             points = newPoints || [];
-            secondarySeries = newSecondarySeries || [];
+            hiloPoints = newHiloPoints || [];
+            if (newUnitLabel) opts.unitLabel = newUnitLabel;
+            if (newFormatValue) opts.formatValue = newFormatValue;
             slider.min = '0';
             slider.max = String(Math.max(0, points.length - 1));
             slider.step = '1';
-            const startAt = points.length ? nowIndex() : 0;
-            select(Math.min(selectedIndex || startAt, Math.max(0, points.length - 1)), { announce: false });
+            select(Math.min(selectedIndex, Math.max(0, points.length - 1)), { announce: false });
         },
         selectByTime(t) { select(nearestIndexToTime(t)); },
-        selectNow() { select(nowIndex()); },
         select,
         redraw: draw,
         destroy() {
-            cancelAnimationFrame(draw._raf);
             canvas.removeEventListener('mousedown', onMouseDown);
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
