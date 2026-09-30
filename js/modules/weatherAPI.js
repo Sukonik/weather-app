@@ -38,7 +38,12 @@ const AQI_CACHE_MS = 10 * 60 * 1000;
  */
 export async function getWeatherData(latitude, longitude, locationName) {
     const coordKey = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=${WEATHER_CURRENT}&hourly=${WEATHER_HOURLY}&daily=${WEATHER_DAILY}&timezone=auto`;
+    // past_hours=3: a little recent history so the scrubbable hourly
+    // timeline has real past points to show alongside the forecast, not
+    // just a hard start exactly at "now". forecast_days=2 is plenty for an
+    // hourly timeline and keeps the payload small — daily arrays used
+    // elsewhere only ever read index 0 (today).
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=${WEATHER_CURRENT}&hourly=${WEATHER_HOURLY}&daily=${WEATHER_DAILY}&timezone=auto&past_hours=3&forecast_days=2`;
     const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=${AIR_QUALITY_CURRENT}&hourly=${AIR_QUALITY_HOURLY}&timezone=auto`;
 
     const [weatherResult, airQualityResult] = await Promise.allSettled([
