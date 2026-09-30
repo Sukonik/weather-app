@@ -443,13 +443,27 @@ try {
         if (precipCanvas) resizeObserver.observe(precipCanvas);
         if (windCanvas) resizeObserver.observe(windCanvas);
 
+        // Two location changes can legitimately fire in quick succession —
+        // e.g. the Issue #9 Home fallback selecting a location right before
+        // a user's own search resolves to that same place — and each
+        // starts its own async fetch. Without a guard, whichever fetch
+        // happens to resolve *last* wins and tears down/rebuilds the hourly
+        // timeline (and every other display) even if it's now stale,
+        // which can land mid-interaction (e.g. right after a keyboard
+        // selection) and silently undo it. A generation counter, the same
+        // pattern chrome.js already uses for its own location races,
+        // discards a response that's no longer the most recent request.
+        let weatherRequestGeneration = 0;
+
         async function updateWeather(latitude, longitude, locationName) {
             lastLocation = { latitude, longitude, name: locationName };
+            const requestGeneration = ++weatherRequestGeneration;
             try {
                 if (loadingElement) loadingElement.style.display = 'flex';
                 if (errorElement) { errorElement.textContent = ''; errorElement.innerHTML = ''; }
 
                 const data = await getWeatherData(latitude, longitude, locationName);
+                if (requestGeneration !== weatherRequestGeneration) return; // superseded by a newer request
                 if (!data || !data.current) {
                     throw new Error('Invalid weather data received');
                 }
@@ -464,6 +478,7 @@ try {
 
                 if (loadingElement) loadingElement.style.display = 'none';
             } catch (error) {
+                if (requestGeneration !== weatherRequestGeneration) return; // superseded by a newer request
                 console.error('Error updating weather:', error);
                 if (errorElement) {
                     errorElement.innerHTML = `<span>${error.message || 'Unable to fetch weather data. Please try again.'}</span> <button type="button" class="retry-inline-btn" id="weather-retry-btn">Retry</button>`;
