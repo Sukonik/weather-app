@@ -17,10 +17,23 @@ export function formatSpeed(speed, unit) {
 }
 
 export function getWindDirection(degrees) {
-    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     const index = Math.round(degrees / 22.5) % 16;
     return directions[index];
+}
+
+/**
+ * Simple wind-strength bands in km/h — used consistently for the legend,
+ * the current-conditions badge, and outdoor-item/cyclist guidance
+ * thresholds, so all three always agree with each other.
+ */
+export function getWindStrengthCategory(speedKmh) {
+    if (speedKmh == null || Number.isNaN(speedKmh)) return { label: 'Unavailable', class: 'sev-1' };
+    if (speedKmh < 20) return { label: 'Light', class: 'sev-1' };
+    if (speedKmh < 40) return { label: 'Moderate', class: 'sev-2' };
+    if (speedKmh < 60) return { label: 'Strong', class: 'sev-4' };
+    return { label: 'Very Strong', class: 'sev-6' };
 }
 
 export function getWeatherDescription(code) {
