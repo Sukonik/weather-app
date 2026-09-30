@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1a1a1a">
     <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
     <title>ClearSky Weather App</title>
-    <link rel="stylesheet" href="styles.css?v=20260901a">
+    <link rel="stylesheet" href="styles.css?v=20260930a">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -40,9 +40,27 @@
                 </div>
             </div>
 
-            <div class="hourly-strip-section">
-                <h2 class="section-label">Hourly Forecast</h2>
-                <div class="hourly-strip" id="hourly-strip"></div>
+            <div class="hourly-card hourly-timeline-card">
+                <div class="card-header-row">
+                    <h3>HOURLY FORECAST</h3>
+                    <div class="range-toggle" role="group" aria-label="Chart range">
+                        <button class="time-btn range-btn active" data-hourly-range="24" type="button">24H</button>
+                        <button class="time-btn range-btn" data-hourly-range="48" type="button">48H</button>
+                    </div>
+                </div>
+                <canvas id="hourly-timeline-chart" width="640" height="220" aria-hidden="true"></canvas>
+                <label class="tide-slider-label" for="hourly-timeline-slider" id="hourly-timeline-slider-label">Selected hour on timeline</label>
+                <input type="range" id="hourly-timeline-slider" class="tide-slider" min="0" max="0" step="1" value="0"
+                    aria-labelledby="hourly-timeline-slider-label">
+                <div class="tide-selected-panel" id="hourly-selected-panel">
+                    <div class="tide-selected-row"><span class="tsp-label">Time</span><span class="tsp-value" id="hourly-tsp-time">--</span></div>
+                    <div class="tide-selected-row"><span class="tsp-label">Condition</span><span class="tsp-value" id="hourly-tsp-condition">--</span></div>
+                    <div class="tide-selected-row"><span class="tsp-label">Temperature</span><span class="tsp-value" id="hourly-tsp-temp">--</span></div>
+                    <div class="tide-selected-row"><span class="tsp-label">Precipitation</span><span class="tsp-value" id="hourly-tsp-precip">--</span></div>
+                    <div class="tide-selected-row"><span class="tsp-label">Wind</span><span class="tsp-value" id="hourly-tsp-wind">--</span></div>
+                    <div class="tide-selected-row"><span class="tsp-label">Gusts</span><span class="tsp-value" id="hourly-tsp-gusts">--</span></div>
+                </div>
+                <div class="sr-only" aria-live="polite" id="hourly-timeline-announce"></div>
             </div>
 
             <div class="weather-details">
@@ -233,6 +251,6 @@
             </div>
         </main>
     </div>
-    <script type="module" src="script.js?v=20260901a"></script>
+    <script type="module" src="script.js?v=20260930a"></script>
 </body>
 </html>

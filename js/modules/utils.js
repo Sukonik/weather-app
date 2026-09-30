@@ -176,3 +176,25 @@ export function formatPressure(hPa, unit = 'hPa') {
     if (hPa === null || hPa === undefined) return 'Data unavailable';
     return unit === 'inHg' ? `${convertPressure(hPa, 'inHg').toFixed(2)} inHg` : `${Math.round(hPa)} hPa`;
 }
+
+/**
+ * Open-Meteo's `timezone=auto` mode returns hourly/daily timestamps as
+ * naive local-time strings for the *queried location* — e.g. "2026-09-30T21:00"
+ * with no 'Z' or offset. `new Date(...)` parses a naive date-time string
+ * as local to whoever's *running* the code, not the location it describes.
+ * On a GitHub Actions runner (UTC) that silently treats Long Beach, NY's
+ * 9pm EDT as 9pm UTC — a 4-hour error that grows/shrinks with the
+ * location's real UTC offset and DST state. Comparing those mis-parsed
+ * values against a real `Date.now()` epoch (correct) then finds the wrong
+ * "current hour," which is exactly backwards for anything scrubbable
+ * (a "Now" marker, a past/future window) even though it was harmless for
+ * older code that only needed "some plausible index to start a forward
+ * list from." `utc_offset_seconds` is a top-level field on every
+ * Open-Meteo forecast/air-quality response — this converts a naive local
+ * string to the true UTC epoch using it, independent of the viewer's own
+ * device timezone or DST.
+ */
+export function parseOpenMeteoTime(isoLocalString, utcOffsetSeconds) {
+    const asIfUTC = Date.parse(`${isoLocalString}Z`);
+    return asIfUTC - (utcOffsetSeconds || 0) * 1000;
+}
